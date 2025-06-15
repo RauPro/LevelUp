@@ -1,0 +1,5 @@
+outs:
+- md5: 4e8517bfc2c0fd1b091ca133f3c894fa
+  size: 77683604
+  hash: md5
+  path: codeforces_train.csv
