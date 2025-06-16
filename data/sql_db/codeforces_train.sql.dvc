@@ -1,0 +1,5 @@
+outs:
+- md5: 2da2f12203fa9b6017bd50a22bc89091
+  size: 133907049
+  hash: md5
+  path: codeforces_train.sql
