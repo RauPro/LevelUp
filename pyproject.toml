@@ -1,12 +1,79 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "levelup"
 version = "0.1.0"
-description = "Add your description here"
-requires-python = ">=3.12"
+description = "AI-Powered Technical Interview Platform"
+readme = "README.md"
+authors = [
+    {name = "LevelUp Team"}
+]
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
 dependencies = [
-    "datasets>=3.6.0",
+    "fastapi>=0.104.1",
+    "uvicorn>=0.23.2",
+    "pydantic>=2.4.2",
+    "python-dotenv>=1.0.0",
+    "pytest>=7.4.3",
+    "httpx>=0.25.1",
+    "datasets>=3.1.0",
+    "psycopg2>=2.9.10",
+    "numpy>=1.24.4",
+    "click",
+    "h11",
+    "starlette",
+    "pydantic_core",
+    "typing_extensions",
+    "typing_inspection",
 ]
 
-[build-system]
-requires = ["uv>=0.1.36"]
-build-backend = "uv.buildapi"
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.1.3",
+    "mypy>=1.6.1",
+    "black>=23.10.1",
+    "pytest-cov>=4.1.0",
+]
+
+[tool.setuptools]
+packages = ["app", "ml", "data", "pipelines", "tests"]
+
+[tool.ruff]
+line-length = 500
+target-version = "py39"
+exclude = ["data"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "ANN", "B", "A"]
+ignore = []
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "ml", "data", "pipelines"]
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+strict_optional = true
+exclude = ["data/"]
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
