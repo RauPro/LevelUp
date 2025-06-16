@@ -1,5 +1,3 @@
-import pandas as pd
-import psycopg2
 
 
 def process_codeforces_data(df):

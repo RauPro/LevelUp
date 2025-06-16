@@ -22,9 +22,9 @@ This is achieved using a Retrieval Augmented Generation (RAG) model that combine
 ## 👥 Target Audience
 
 Our primary customers and stakeholders include:
--   Technical Interviewers 
--   Hiring Managers 
--   Lead Engineers 
+-   Technical Interviewers
+-   Hiring Managers
+-   Lead Engineers
 
 ## 🏛️ System Architecture
 
@@ -44,12 +44,12 @@ The LevelUp platform is built on a robust and scalable machine learning system a
 ## 🛠️ Tech Stack
 
 -   **Backend**: FastAPI
--   **Databases**: PostgreSQL (for metadata), Vector Database (for embeddings) 
+-   **Databases**: PostgreSQL (for metadata), Vector Database (for embeddings)
 -   **ML Models**:
-    -   **Embedding Model**: OpenAI, MiniLM, or similar 
-    -   **Generator Model (LLM)** 
--   **ML Approach**: Retrieval Augmented Generation (RAG) 
--   **Data Source**: Hugging Face dataset `evanellis/codeforces_with_only_correct_completions` 
+    -   **Embedding Model**: OpenAI, MiniLM, or similar
+    -   **Generator Model (LLM)**
+-   **ML Approach**: Retrieval Augmented Generation (RAG)
+-   **Data Source**: Hugging Face dataset `evanellis/codeforces_with_only_correct_completions`
 
 ## ⚙️ Setup and Installation
 
@@ -97,4 +97,3 @@ To validate the effectiveness of our solution, we plan to conduct a beta program
 ## 🤝 Contribution
 
 We welcome contributions to the LevelUp project! If you have ideas for new features, improvements, or bug fixes, please feel free to open an issue or submit a pull request.
-

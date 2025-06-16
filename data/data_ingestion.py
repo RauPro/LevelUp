@@ -1,15 +1,15 @@
 import json
-import os
-from datasets import load_dataset, DatasetDict
 import logging
-import psycopg2
-from psycopg2.extras import execute_values
+import os
 import subprocess
-from dotenv import load_dotenv
+
 import numpy as np
+import psycopg2
+from datasets import DatasetDict, load_dataset
+from dotenv import load_dotenv
+from psycopg2.extras import execute_values
 
 from data.preprocessing import process_codeforces_data
-
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -112,7 +112,7 @@ if __name__ == '__main__':
         df = raw_dataset['train'].to_pandas()
         df = process_codeforces_data(df)
         save_to_postgres(df)
-        print(f"\nTrain split saved to PostgreSQL table 'codeforces_train'")
+        print("\nTrain split saved to PostgreSQL table 'codeforces_train'")
         # Export the table as SQL for DVC tracking
         export_table_as_sql('codeforces_train', 'sql_db/codeforces_train.sql')
         print("Table exported as SQL to data/codeforces_train.sql")

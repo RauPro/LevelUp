@@ -1,18 +1,21 @@
 # Makefile for LevelUp project
 
-.PHONY: venv install clean
+.PHONY: venv install clean lint typecheck check
 
 venv:
 	uv venv .venv
 
 install:
 	uv pip sync pyproject.toml
-	@echo ""
-	@echo "✅ Dependencies installed!"
-	@echo "👉 To activate the virtual environment, run:"
-	@echo "   source .venv/bin/activate   # for macOS/Linux/zsh/bash"
-	@echo "   .venv\\Scripts\\activate    # for Windows"
-	@echo ""
 
 clean:
 	rm -rf .venv __pycache__ *.pyc *.pyo *.pyd *.log .pytest_cache .mypy_cache
+
+lint:
+	uv run ruff check . --fix
+	uv run ruff format .
+
+typecheck:
+	uv run mypy .
+
+check: lint typecheck
