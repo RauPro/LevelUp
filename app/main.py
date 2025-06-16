@@ -13,6 +13,10 @@ app = FastAPI(
 
 @app.get("/")
 async def root() -> dict:
+    """
+    Root endpoint for the LevelUp API.
+    :return:
+    """
     return {
         "message": "Welcome to the LevelUp API",
         "description": "Generate unique technical interview problems using AI",
