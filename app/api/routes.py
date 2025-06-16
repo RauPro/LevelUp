@@ -1,13 +1,14 @@
 
-from fastapi import APIRouter, HTTPException
 from typing import List
+
+from fastapi import APIRouter, HTTPException
 
 from app.api.schemas import (
     DifficultyLevel,
-    ProblemTopic,
+    ProblemExample,
     ProblemRequest,
     ProblemResponse,
-    ProblemExample
+    ProblemTopic,
 )
 
 router = APIRouter()
@@ -46,7 +47,8 @@ async def generate_problem(request: ProblemRequest) -> ProblemResponse:
         return ProblemResponse(
             id="prob123",
             title=f"{request.topic.value.title()} Challenge",
-            description=f"This is a {request.difficulty.value} problem about {request.topic.value}.",
+            description=f"This is a {request.difficulty.value} problem about"
+                        f" {request.topic.value}.",
             constraints=["1 <= n <= 10^5", "Time Complexity: O(n)", "Space Complexity: O(1)"],
             examples=[
                 ProblemExample(
@@ -59,7 +61,7 @@ async def generate_problem(request: ProblemRequest) -> ProblemResponse:
             topic=request.topic
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to generate problem: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate problem: {str(e)}") from e
 
 
 @router.get("/problems/{problem_id}", response_model=ProblemResponse)
