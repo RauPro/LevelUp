@@ -1,7 +1,8 @@
 
-from pydantic import BaseModel, Field
-from typing import List, Optional
 from enum import Enum
+from typing import List, Optional
+
+from pydantic import BaseModel, Field
 
 
 class DifficultyLevel(str, Enum):
@@ -26,7 +27,8 @@ class ProblemTopic(str, Enum):
 class ProblemRequest(BaseModel):
     topic: ProblemTopic
     difficulty: DifficultyLevel
-    keywords: Optional[List[str]] = Field(default=None, description="Optional keywords to tailor the problem")
+    keywords: Optional[List[str]] = Field(default=None,
+                                          description="Optional keywords to tailor the problem")
 
 
 class ProblemExample(BaseModel):

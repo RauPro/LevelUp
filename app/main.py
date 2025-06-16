@@ -1,8 +1,8 @@
 
-from fastapi import FastAPI
 import uvicorn
-from app.api.routes import router as api_router
+from fastapi import FastAPI
 
+from app.api.routes import router as api_router
 
 app = FastAPI(
     title="LevelUp API",
