@@ -38,7 +38,7 @@ packages = ["app", "ml", "data", "pipelines", "tests"]
 
 [tool.ruff]
 select = ["E", "F", "W", "I", "N", "UP", "ANN", "B", "A"]
-ignore = ["ANN101"]  # Ignore missing type annotation for self
+ignore = ["ANN101"]
 line-length = 100
 target-version = "py38"
 
