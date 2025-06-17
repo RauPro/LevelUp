@@ -19,13 +19,6 @@ This is achieved using a Retrieval Augmented Generation (RAG) model that combine
 -   **Ensure Fairness**: Provide standardized yet unique challenges for each candidate, ensuring a fair and consistent evaluation process.
 -   **Customizable Content**: Tailor problems to specific topics and difficulty levels to match the requirements of the role.
 
-## 👥 Target Audience
-
-Our primary customers and stakeholders include:
--   Technical Interviewers 
--   Hiring Managers 
--   Lead Engineers 
-
 ## 🏛️ System Architecture
 
 The LevelUp platform is built on a robust and scalable machine learning system architecture:
@@ -35,66 +28,72 @@ The LevelUp platform is built on a robust and scalable machine learning system a
 3.  **Data Ingestion**: A scraper ingests problems from sources like Codeforces. This data is then preprocessed and stored.
 4.  **Metadata and Vector Storage**: Problem metadata is stored in a PostgreSQL database, while problem embeddings are stored in a Vector Database for efficient semantic retrieval.
 5.  **RAG and LLM Pipeline**:
-    * An **Embedding Generator** (e.g., OpenAI, MiniLM) creates vector embeddings of the problems.
+    * An **Embedding Generator** creates vector embeddings of the problems.
     * The **RAG Retriever** finds relevant problems from the vector database based on the user's query.
     * A **Prompt Generator** creates a prompt for the LLM based on the retrieved problems.
     * The **LLM** generates a unique problem based on the provided topic and style.
-6.  **Evaluation and Monitoring**: User feedback is collected and stored in an evaluation and tracing database to monitor performance and improve the system. A separate LLM is used to verify the output of the main LLM, ensuring the quality of the generated problems.
 
 ## 🛠️ Tech Stack
 
 -   **Backend**: FastAPI
--   **Databases**: PostgreSQL (for metadata), Vector Database (for embeddings) 
--   **ML Models**:
-    -   **Embedding Model**: OpenAI, MiniLM, or similar 
-    -   **Generator Model (LLM)** 
--   **ML Approach**: Retrieval Augmented Generation (RAG) 
--   **Data Source**: Hugging Face dataset `evanellis/codeforces_with_only_correct_completions` 
+-   **ML Pipeline**: Retrieval Augmented Generation (RAG)
+-   **Code Quality**: Ruff, Mypy
+-   **Testing**: Pytest
 
-## ⚙️ Setup and Installation
+## ⚙️ Installation
 
 1.  **Clone the repository:**
     ```bash
-    git clone [https://github.com/your-username/levelup.git](https://github.com/your-username/levelup.git)
-    cd levelup
+    git clone https://github.com/your-username/LevelUp.git
+    cd LevelUp
     ```
 
 2.  **Create and activate a virtual environment:**
     ```bash
-    python -m venv venv
-    source venv/bin/activate
+    # Using UV for faster package management
+    pip install uv
+    uv venv
+    # On Windows
+    .venv\Scripts\activate
+    # On Unix/MacOS
+    source .venv/bin/activate
     ```
 
 3.  **Install the dependencies:**
     ```bash
-    pip install -r requirements.txt
+    uv pip install -e .
     ```
 
-4.  **Set up environment variables:**
-    -   Create a `.env` file in the root directory.
-    -   Add the necessary API keys and configuration variables for your LLM and database connections.
+## 🚀 Running the Application
 
-## 🚀 How to Run
-
-1.  **Run the data pipeline (if necessary):**
-    -   To populate the vector database with initial problems, execute the data ingestion and embedding generation scripts.
+1.  **Start the FastAPI server:**
     ```bash
-    python pipelines/training_pipeline.py
+    uvicorn app.main:app --reload
     ```
 
-2.  **Start the Flask application:**
-    ```bash
-    python app/main.py
-    ```
+2.  **Access the API documentation:**
+    -   Open your web browser and navigate to `http://127.0.0.1:8000/docs` for the Swagger UI documentation
+    -   Or visit `http://127.0.0.1:8000/redoc` for ReDoc documentation
 
-3.  **Access the application:**
-    -   Open your web browser and navigate to `http://127.0.0.1:5000`.
+## 🧪 Running Tests
 
-## ✅ Validation
+Run the tests using pytest:
+```bash
+pytest
+```
 
-To validate the effectiveness of our solution, we plan to conduct a beta program with hiring managers, allowing them to use the generated problems in live interviews and provide valuable feedback.
+## 🧹 Code Quality
+
+Check code quality with Ruff:
+```bash
+ruff check .
+```
+
+Run type checking with Mypy:
+```bash
+mypy .
+```
 
 ## 🤝 Contribution
 
 We welcome contributions to the LevelUp project! If you have ideas for new features, improvements, or bug fixes, please feel free to open an issue or submit a pull request.
-
