@@ -1,6 +1,7 @@
+from pandas import DataFrame
 
 
-def process_codeforces_data(df):
+def process_codeforces_data(df : DataFrame) -> DataFrame:
     print("\n--- 2. Filtering for Programming Problems ---")
     df = df[df['type'] == 'PROGRAMMING'].copy()
     print(f"Shape after filtering for 'PROGRAMMING' type: {df.shape}")
@@ -34,7 +35,8 @@ def process_codeforces_data(df):
     df.dropna(subset=critical_columns, inplace=True)
 
     if initial_rows > df.shape[0]:
-        print(f"Dropped {initial_rows - df.shape[0]} rows containing null values in critical columns.")
+        print(f"Dropped {initial_rows - df.shape[0]} rows containing null values in critical "
+              f"columns.")
     else:
         print("No rows with null values in critical columns found.")
 
