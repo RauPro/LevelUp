@@ -1,3 +1,32 @@
+import datetime
+from uuid import UUID
+
+from pydantic import BaseModel
+
+
+class ChatStartResponse(BaseModel):
+    session_id: UUID
+
+
+class ChatMessageRequest(BaseModel):
+    session_id: UUID
+    message: str
+
+
+class ChatMessage(BaseModel):
+    sender: str
+    message: str
+    timestamp: datetime.datetime
+
+
+class ChatMessageResponse(BaseModel):
+    reply: str
+    history: list[ChatMessage]
+
+
+class ChatHistoryResponse(BaseModel):
+    history: list[ChatMessage]
+
 
 from enum import Enum
 from typing import List, Optional
@@ -27,8 +56,7 @@ class ProblemTopic(str, Enum):
 class ProblemRequest(BaseModel):
     topic: ProblemTopic
     difficulty: DifficultyLevel
-    keywords: Optional[List[str]] = Field(default=None,
-                                          description="Optional keywords to tailor the problem")
+    user_prompt: str
 
 
 class ProblemExample(BaseModel):
