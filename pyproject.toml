@@ -10,7 +10,7 @@ readme = "README.md"
 authors = [
     {name = "LevelUp Team"}
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
@@ -26,6 +26,12 @@ dependencies = [
     "datasets>=3.1.0",
     "psycopg2>=2.9.10",
     "numpy>=1.24.4",
+    "click",
+    "h11",
+    "starlette",
+    "pydantic_core",
+    "typing_extensions",
+    "typing_inspection",
 ]
 
 [project.optional-dependencies]
@@ -34,22 +40,26 @@ dev = [
     "mypy>=1.6.1",
     "black>=23.10.1",
     "pytest-cov>=4.1.0",
+    "pre-commit>=3.5.0",
 ]
 
 [tool.setuptools]
 packages = ["app", "ml", "data", "pipelines", "tests"]
 
 [tool.ruff]
-select = ["E", "F", "W", "I", "N", "UP", "ANN", "B", "A"]
-ignore = ["ANN101"]
-line-length = 100
-target-version = "py38"
+line-length = 500
+target-version = "py39"
+exclude = ["data"]
 
-[tool.ruff.isort]
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "ANN", "B", "A"]
+ignore = []
+
+[tool.ruff.lint.isort]
 known-first-party = ["app", "ml", "data", "pipelines"]
 
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.9"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
@@ -58,6 +68,7 @@ check_untyped_defs = true
 disallow_untyped_decorators = true
 no_implicit_optional = true
 strict_optional = true
+exclude = ["data/"]
 
 [[tool.mypy.overrides]]
 module = "tests.*"
