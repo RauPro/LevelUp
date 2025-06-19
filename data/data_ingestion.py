@@ -11,6 +11,7 @@ from pandas.core.interchange.dataframe_protocol import DataFrame
 from psycopg2.extras import execute_values
 
 from data.preprocessing import process_codeforces_data
+from ml.embedding_generator import problem_collection, add_to_chroma_in_batches
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -111,6 +112,16 @@ def export_table_as_sql(table_name: str, output_path: str) -> None:
     subprocess.run(cmd, check=True, env=env)
 
 
+def populate_vector_db(df: DataFrame):
+    """
+    Generates embeddings and stores problems in ChromaDB.
+    """
+    logging.info("Populating vector database...")
+    add_to_chroma_in_batches(df)
+    logging.info(f"Successfully added problems to the vector database.")
+
+
+
 if __name__ == '__main__':
     print("Running the data ingestion script as a standalone program...")
     raw_dataset = download_codeforces_dataset()
@@ -119,8 +130,9 @@ if __name__ == '__main__':
         print(raw_dataset['train'][0])
         df = raw_dataset['train'].to_pandas()
         df = process_codeforces_data(df)
-        save_to_postgres(df)
+        # save_to_postgres(df)
         print("\nTrain split saved to PostgreSQL table 'codeforces_train'")
+        populate_vector_db(df)
         # Export the table as SQL for DVC tracking
         export_table_as_sql('codeforces_train', 'sql_db/codeforces_train.sql')
         print("Table exported as SQL to data/codeforces_train.sql")
