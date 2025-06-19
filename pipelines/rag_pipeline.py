@@ -7,7 +7,8 @@ from ml.embedding_generator import problem_collection
 # Import the official Mistral AI client
 from mistralai.client import MistralClient
 from mistralai.models.chat_completion import ChatMessage
-
+from dotenv import load_dotenv
+load_dotenv()
 
 # The generate_llm_prompt function remains the same as before.
 def generate_llm_prompt(topic: str, difficulty: str, retrieved_problems: list) -> str:
@@ -26,12 +27,12 @@ def generate_llm_prompt(topic: str, difficulty: str, retrieved_problems: list) -
     return prompt
 
 
-async def generate_new_problem(request: ProblemRequest) -> dict:
+async def generate_new_problem(request: ProblemRequest) -> str:
     """
     The main RAG pipeline function using the Mistral AI client.
     """
     # 1. Retrieval part (this stays the same)
-    query_text = f"{request.topic.value} {request.difficulty.value} {request.user_propmt}"
+    query_text = f"{request.topic.value} {request.difficulty.value} {request.user_prompt}"
 
     retrieved = problem_collection.query(
         query_texts=[query_text],
