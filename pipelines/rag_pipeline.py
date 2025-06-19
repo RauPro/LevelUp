@@ -2,7 +2,7 @@
 import os
 import json
 from app.api.schemas import ProblemRequest
-from ml.vector_db import problem_collection
+from ml.embedding_generator import problem_collection
 
 # Import the official Mistral AI client
 from mistralai.client import MistralClient
@@ -21,7 +21,7 @@ def generate_llm_prompt(topic: str, difficulty: str, retrieved_problems: list) -
         prompt += f"Title: {prob['metadatas']['name']}\n"
         prompt += f"Description: {prob['documents']}\n\n"
     prompt += "--- END OF EXAMPLES ---\n\n"
-    prompt += "Now, generate a brand new problem. IMPORTANT: You must respond with only the JSON object for the problem, following this exact structure: { 'title': '...', 'description': '...', 'constraints': ['...'], 'example': { 'input': '...', 'output': '...', 'explanation': '...' } }\n"
+    prompt += "Now, generate a brand new problem. IMPORTANT: You must respond with only the JSON object for the problem, following this exact structure: { 'title': '...', 'description': '...', 'constraints': ['...'], 'example': { 'input': '...', 'output': '...', 'explanation': '...' }, 'python_solution': '...' }\n"
 
     return prompt
 
@@ -31,9 +31,7 @@ async def generate_new_problem(request: ProblemRequest) -> dict:
     The main RAG pipeline function using the Mistral AI client.
     """
     # 1. Retrieval part (this stays the same)
-    query_text = f"{request.topic.value} {request.difficulty.value}"
-    if request.keywords:
-        query_text += " " + " ".join(request.keywords)
+    query_text = f"{request.topic.value} {request.difficulty.value} {request.user_propmt}"
 
     retrieved = problem_collection.query(
         query_texts=[query_text],
@@ -67,8 +65,6 @@ async def generate_new_problem(request: ProblemRequest) -> dict:
         messages=messages,
         # response_format={"type": "json_object"} # Uncomment if using a model that supports this
     )
-
     generated_content = chat_response.choices[0].message.content
-    new_problem = json.loads(generated_content)
-
-    return new_problem
+    #new_problem = json.loads(generated_content)
+    return generated_content

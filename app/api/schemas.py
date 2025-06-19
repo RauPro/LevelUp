@@ -56,8 +56,7 @@ class ProblemTopic(str, Enum):
 class ProblemRequest(BaseModel):
     topic: ProblemTopic
     difficulty: DifficultyLevel
-    keywords: Optional[List[str]] = Field(default=None,
-                                          description="Optional keywords to tailor the problem")
+    user_prompt: str
 
 
 class ProblemExample(BaseModel):
