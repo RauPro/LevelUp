@@ -7,6 +7,7 @@ import numpy as np
 import psycopg2
 from datasets import DatasetDict, load_dataset
 from dotenv import load_dotenv
+from pandas.core.interchange.dataframe_protocol import DataFrame
 from psycopg2.extras import execute_values
 
 from data.preprocessing import process_codeforces_data
@@ -26,7 +27,8 @@ POSTGRES_CONFIG = {
 
 def download_codeforces_dataset(cache_dir: str = "./hf_cache") -> DatasetDict:
     try:
-        logging.info("Starting download of the dataset 'evanellis/codeforces_with_only_correct_completions'...")
+        logging.info("Starting download of the dataset"
+                     " 'evanellis/codeforces_with_only_correct_completions'...")
 
         # Ensure the cache directory exists
         os.makedirs(cache_dir, exist_ok=True)
@@ -46,7 +48,7 @@ def download_codeforces_dataset(cache_dir: str = "./hf_cache") -> DatasetDict:
         logging.error(f"Error downloading the dataset from Hugging Face: {e}")
         raise
 
-def save_to_postgres(df, table_name='codeforces_train'):
+def save_to_postgres(df: DataFrame, table_name: str) -> any:
     conn = psycopg2.connect(**POSTGRES_CONFIG)
     cur = conn.cursor()
     cur.execute(f"""
@@ -67,9 +69,12 @@ def save_to_postgres(df, table_name='codeforces_train'):
             code TEXT
         )
     """)
-    records = df[['contestId', 'index', 'name', 'rating', 'tags', 'problem-description', 'input-specification', 'output-specification', 'demo-input', 'demo-output', 'note', 'code']].values.tolist()
-    def adapt_record(record):
-        def convert_value(v):
+    records = df[['contestId', 'index', 'name', 'rating', 'tags',
+                  'problem-description', 'input-specification',
+                  'output-specification', 'demo-input',
+                  'demo-output', 'note', 'code']].values.tolist()
+    def adapt_record(record: list) -> any:
+        def convert_value(v: any) -> any:
             if isinstance(v, np.ndarray):
                 return v.tolist()
             elif isinstance(v, dict):
@@ -79,14 +84,17 @@ def save_to_postgres(df, table_name='codeforces_train'):
         return [convert_value(v) for v in record]
     records = [adapt_record(row) for row in records]
     execute_values(cur,
-        f"INSERT INTO {table_name} (contestId, idx, name, rating, tags, problem_description, input_specification, output_specification, demo_input, demo_output, note, code) VALUES %s",
+        f"INSERT INTO {table_name} "
+        f"(contestId, idx, name, rating, tags, problem_description, "
+        f"input_specification, output_specification, demo_input, demo_output, "
+        f"note, code) VALUES %s",
         records
     )
     conn.commit()
     cur.close()
     conn.close()
 
-def export_table_as_sql(table_name, output_path):
+def export_table_as_sql(table_name: str, output_path: str) -> None:
     output_dir = os.path.dirname(output_path)
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
