@@ -1,4 +1,6 @@
 import datetime
+from enum import Enum
+from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -26,12 +28,6 @@ class ChatMessageResponse(BaseModel):
 
 class ChatHistoryResponse(BaseModel):
     history: list[ChatMessage]
-
-
-from enum import Enum
-from typing import List, Optional
-
-from pydantic import BaseModel, Field
 
 
 class DifficultyLevel(str, Enum):
@@ -69,7 +65,7 @@ class ProblemResponse(BaseModel):
     id: str
     title: str
     description: str
-    constraints: List[str]
-    examples: List[ProblemExample]
+    constraints: list[str]
+    examples: list[ProblemExample]
     difficulty: DifficultyLevel
     topic: ProblemTopic
