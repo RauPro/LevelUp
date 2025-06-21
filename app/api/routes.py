@@ -34,11 +34,9 @@ async def post_message(request: ProblemRequest) -> dict:
     # if request.session_id not in chat_histories:
     #     raise HTTPException(status_code=404, detail="Session not found")
 
-    # Add user message to history
     # user_message = ChatMessage(sender="user", message=request.message, timestamp=datetime.datetime.now())
     # chat_histories[request.session_id].append(user_message)
 
-    # Generate a dummy bot reply
     bot_reply = await generate_problem(request)
     #chat_histories[request.session_id].append(bot_reply)
 
@@ -89,10 +87,7 @@ async def generate_problem(request: ProblemRequest) -> dict:
     Raises:
         HTTPException: If problem generation fails
     """
-    # This is a mock implementation - in a real scenario, this would call
-    # the RAG system to generate a unique problem
     try:
-        # Mock response for demonstration purposes
         return {"response": await generate_new_problem(request)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate problem: {str(e)}") from e
