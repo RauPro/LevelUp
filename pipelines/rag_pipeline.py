@@ -1,8 +1,9 @@
 # ml/rag_pipeline.py
 import os
-from typing import Any
 
-from dotenv import load_dotenv
+import json
+from app.api.schemas import ProblemRequest, ProblemResponse
+from ml.embedding_generator import problem_collection
 
 # Import the official Mistral AI client
 from mistralai.client import MistralClient
@@ -26,16 +27,37 @@ def generate_llm_prompt(topic: str, difficulty: str, retrieved_problems: list[di
         prompt += f"Title: {prob['metadatas']['name']}\n"
         prompt += f"Description: {prob['documents']}\n\n"
     prompt += "--- END OF EXAMPLES ---\n\n"
-    prompt += "Now, generate a brand new problem. IMPORTANT: You must respond with only the JSON object for the problem, following this exact structure: { 'title': '...', 'description': '...', 'constraints': ['...'], 'example': { 'input': '...', 'output': '...', 'explanation': '...' }, 'python_solution': '...' }\n"
+    prompt += (
+        "Now, generate a brand new problem. IMPORTANT: You must respond with only the JSON object for the problem, "
+        "following this exact structure:\n"
+        "{\n"
+        "  'id': '...',  // Generate a unique identifier\n"
+        "  'title': '...',  // A concise title for the problem\n"
+        "  'description': '...',  // Detailed problem description\n"
+        "  'constraints': ['...', '...'],  // List of constraints as strings\n"
+        "  'examples': [\n"
+        "    {\n"
+        "      'input': '...',\n"
+        "      'output': '...',\n"
+        "      'explanation': '...'  // Optional field\n"
+        "    },\n"
+        "    // You can include multiple examples\n"
+        "  ],\n"
+        f"  'difficulty': '{difficulty.lower()}',\n"
+        f"  'topic': '{topic.lower()}',\n"
+        "  'python_solution': '...'  // Complete, runnable Python function that solves the problem with example calls\n"
+        "}\n"
+        "Make sure to include at least one example with input, output, and explanation. Make sure Python code is runnable and solves the problem.\n"
+    )
 
     return prompt
 
 
-async def generate_new_problem(request: ProblemRequest) -> str:
+async def generate_new_problem(request: ProblemRequest) -> ProblemResponse:
     """
     The main RAG pipeline function using the Mistral AI client.
     """
-    # 1. Retrieval part (this stays the same)
+
     query_text = f"{request.topic.value} {request.difficulty.value} {request.user_prompt}"
 
     retrieved = problem_collection.query(
@@ -49,26 +71,57 @@ async def generate_new_problem(request: ProblemRequest) -> str:
     else:
         retrieved_problems = [{"documents": doc, "metadatas": meta} for doc, meta in zip(retrieved["documents"][0], retrieved["metadatas"][0])]
 
-    # 2. Augmented Prompt Generation (this stays the same)
     prompt = generate_llm_prompt(request.topic.value, request.difficulty.value, retrieved_problems)
 
-    # 3. Generation part (this is updated for mistralai client)
     api_key = os.getenv("MISTRAL_API_KEY")
     client = MistralClient(api_key=api_key)
 
-    # Use the 'mistral-tiny' model
     model_name = "mistral-tiny"
 
-    # Format the message using ChatMessage
-    messages = [ChatMessage(role="user", content=prompt)]
+    messages = [
+        ChatMessage(role="user", content=prompt)
+    ]
 
-    # Call the Mistral API
-    # You can use response_format to enforce JSON output with newer Mistral models
-    chat_response = client.chat(  # type: ignore
+    chat_response = client.chat(
         model=model_name,
         messages=messages,
-        # response_format={"type": "json_object"} # Uncomment if using a model that supports this
     )
+    import ast
     generated_content = chat_response.choices[0].message.content
-    # new_problem = json.loads(generated_content)
-    return generated_content or ""
+
+    max_retries = 10
+    retries = 0
+    success = False
+
+    while retries < max_retries and not success:
+        try:
+            new_problem = ast.literal_eval(generated_content)
+            success = True
+        except (SyntaxError, ValueError) as e:
+            print(f"Parsing error (attempt {retries + 1}/{max_retries}): {e}")
+            retries += 1
+
+            if retries < max_retries:
+                retry_messages = messages.copy()
+                retry_messages.append(ChatMessage(role="assistant", content=generated_content))
+                retry_messages.append(ChatMessage(role="user",
+                                                  content="Your previous response couldn't be parsed. Please provide ONLY a valid Python dictionary with the problem data, without any additional text or formatting."))
+
+                chat_response = client.chat(
+                    model=model_name,
+                    messages=retry_messages,
+                )
+                generated_content = chat_response.choices[0].message.content
+            else:
+                print(f"Failed to parse response after {max_retries} attempts")
+                new_problem = {
+                    "title": "Error Generating Problem",
+                    "description": "There was an error generating the problem. Please try again."
+                }
+
+    if not success:
+        new_problem = {
+            "title": "Error Generating Problem",
+            "description": "There was an error generating the problem. Please try again."
+        }
+    return new_problem
