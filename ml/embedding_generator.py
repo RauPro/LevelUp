@@ -1,14 +1,15 @@
+import os
+from pathlib import Path
+from typing import Any, Optional
+
 import chromadb
 import numpy as np
 from chromadb.utils import embedding_functions
-import pandas as pd
-from tqdm import tqdm
-import os
-from pathlib import Path
+from tqdm import tqdm  # type: ignore
 
 
 class EmbeddingGenerator:
-    def __init__(self, db_path=None):
+    def __init__(self, db_path: Optional[str] = None) -> None:
         """
         Initialize the embedding generator with proper persistence setup
 
@@ -30,9 +31,7 @@ class EmbeddingGenerator:
         self.client = chromadb.PersistentClient(path=self.db_path)
 
         # Create an embedding function using a pre-trained model
-        self.sentence_transformer_ef = embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name="all-MiniLM-L6-v2"
-        )
+        self.sentence_transformer_ef = embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
 
         # Create or get the collection
         self.problem_collection = self.client.get_or_create_collection(
@@ -42,7 +41,7 @@ class EmbeddingGenerator:
 
         print(f"Collection initialized with {self.problem_collection.count()} existing documents")
 
-    def add_to_chroma_in_batches(self, df, batch_size=5000):
+    def add_to_chroma_in_batches(self, df: Any, batch_size: int = 5000) -> int:  # noqa: ANN401
         """
         Add dataframe records to ChromaDB collection in batches to avoid exceeding max batch size
 
@@ -59,27 +58,22 @@ class EmbeddingGenerator:
             batch_df = df.iloc[start_idx:end_idx]
 
             # Prepare the batch data for ChromaDB
-            documents = batch_df['problem-description'].tolist()
+            documents = batch_df["problem-description"].tolist()
 
-            metadatas = batch_df[['contestId', 'index', 'name', 'rating', 'tags']].to_dict('records')
+            metadatas = batch_df[["contestId", "index", "name", "rating", "tags"]].to_dict("records")
             # Convert any NumPy arrays to strings in the metadata
             for metadata in metadatas:
-                if isinstance(metadata['tags'], np.ndarray):
-                    metadata['tags'] = ', '.join(metadata['tags'].tolist())
-                elif isinstance(metadata['tags'], list):
-                    metadata['tags'] = ', '.join(metadata['tags'])
+                if isinstance(metadata["tags"], np.ndarray):
+                    metadata["tags"] = ", ".join(metadata["tags"].tolist())
+                elif isinstance(metadata["tags"], list):
+                    metadata["tags"] = ", ".join(metadata["tags"])
 
             # Create unique IDs - using batch index to avoid conflicts
-            ids = [f"{row['contestId']}-{row['index']}-{start_idx + j}"
-                   for j, (_, row) in enumerate(batch_df.iterrows())]
+            ids = [f"{row['contestId']}-{row['index']}-{start_idx + j}" for j, (_, row) in enumerate(batch_df.iterrows())]
 
             try:
                 # Add the batch to the collection
-                self.problem_collection.add(
-                    ids=ids,
-                    documents=documents,
-                    metadatas=metadatas
-                )
+                self.problem_collection.add(ids=ids, documents=documents, metadatas=metadatas)
                 print(f"Batch {i + 1}/{total_batches} added successfully")
             except Exception as e:
                 print(f"Error adding batch {i + 1}: {e}")
@@ -92,7 +86,7 @@ class EmbeddingGenerator:
 
         return final_count
 
-    def get_collection_info(self):
+    def get_collection_info(self) -> int:
         """Get information about the current collection"""
         count = self.problem_collection.count()
         print(f"Collection 'problems' has {count} documents")
@@ -104,7 +98,7 @@ class EmbeddingGenerator:
 
         return count
 
-    def clear_collection(self):
+    def clear_collection(self) -> None:
         """Clear all data from the collection (use with caution!)"""
         try:
             self.client.delete_collection("problems")
@@ -127,7 +121,7 @@ sentence_transformer_ef = embedding_gen.sentence_transformer_ef
 problem_collection = embedding_gen.problem_collection
 
 
-def add_to_chroma_in_batches(df, batch_size=5000):
+def add_to_chroma_in_batches(df: Any, batch_size: int = 5000) -> int:  # noqa: ANN401
     """Backward compatible function"""
     return embedding_gen.add_to_chroma_in_batches(df, batch_size)
 
