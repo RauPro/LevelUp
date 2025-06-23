@@ -33,6 +33,8 @@ from langgraph.graph import END, StateGraph
 from pydantic import BaseModel
 
 from app.api.schemas import DifficultyLevel, ProblemTopic
+from ml.embedding_generator import problem_collection  # Import problem_collection for RAG
+import openai  # Import OpenAI for RAG approach
 
 # Load environment variables from .env file
 dotenv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env")
@@ -74,17 +76,43 @@ sandbox = Sandbox(api_key=os.getenv("E2B_API_KEY"))
 
 # Node functions
 def problem_agent(state: SessionState) -> SessionState:
-    # Create a valid JSON example to guide the LLM
-    example_json = '{{"description": "Add two space-separated numbers", "tests": [{{"input": "5 3", "output": "8"}}]}}'
+    """Generate programming problems using RAG approach."""
+    # Load OpenAI API key
+    openai.api_key = os.getenv("OPENAI_API_KEY")
 
-    prompt_template = f"Generate a programming problem with User input: {{user_prompt}}. Topic from user  prompt: {{topic}}. Difficulty level from user prompt: {{difficulty}}. The problem should be solvable with a Python function that reads from stdin and writes to stdout. For inputs with multiple values, use space-separated format on a single line. Return JSON with 'description' (string) and 'tests' (array of objects with 'input' and 'output' as strings). Example: {example_json}"
-    prompt = ChatPromptTemplate.from_template(prompt_template)
+    # Create a search query from the user input and topic
+    query_text = f"{state['topic'].value} {state['difficulty'].value} {state['user_prompt']}"
 
-    # Instead of using PydanticOutputParser, let's handle JSON manually
-    chain = prompt | llm | StrOutputParser()
+    # Retrieve similar problems from the vector database
+    retrieved = problem_collection.query(
+        query_texts=[query_text],
+        n_results=3,
+    )
 
-    generated_content = chain.invoke({"user_prompt": state["user_prompt"], "topic": state["topic"].value, "difficulty": state["difficulty"].value})
+    # Format the retrieved problems for the prompt
+    retrieved_problems = [
+        {"documents": doc, "metadatas": meta}
+        for doc, meta in zip(retrieved["documents"][0], retrieved["metadatas"][0])
+    ]
 
+    # Generate the prompt using the RAG approach
+    prompt = generate_llm_prompt(state["topic"].value, state["difficulty"].value, retrieved_problems)
+
+    # Create messages for the OpenAI API
+    messages = [{"role": "user", "content": prompt}]
+
+    # Call the OpenAI API
+    response = openai.chat.completions.create(
+        model="gpt-4o",  # Using GPT-4o for better problem generation
+        messages=messages,
+        response_format={"type": "json_object"}
+    )
+
+    # Get the generated content
+    generated_content = response.choices[0].message.content
+    print(f"Generated content: {generated_content}")
+
+    # Parse the JSON response
     max_retries = 10
     retries = 0
     success = False
@@ -92,34 +120,61 @@ def problem_agent(state: SessionState) -> SessionState:
 
     while retries < max_retries and not success:
         try:
-            # Try to extract JSON from the response
-            json_match = re.search(r"\{.*\}", generated_content, re.DOTALL)
-            if json_match:
-                problem_str = json_match.group(0)
-                problem_dict = json.loads(problem_str)
+            # Try to parse the JSON response
+            problem_dict = json.loads(generated_content)
+
+            # Adapt the response to match our Problem structure
+            if "description" in problem_dict and "tests" in problem_dict:
                 problem = Problem(**problem_dict)
                 success = True
             else:
-                raise ValueError("No JSON object found in the response")
+                # If the keys don't match our expected format, try to extract what we need
+                if "title" in problem_dict and "description" in problem_dict:
+                    # Extract from a different format
+                    description = f"{problem_dict.get('title', '')}: {problem_dict.get('description', '')}"
+                    tests = problem_dict.get('examples', [])
+                    if not tests and "input" in problem_dict and "output" in problem_dict:
+                        tests = [{"input": problem_dict["input"], "output": problem_dict["output"]}]
+
+                    problem = Problem(description=description, tests=tests)
+                    success = True
+                else:
+                    raise ValueError(f"Unexpected JSON structure: {problem_dict.keys()}")
 
         except (json.JSONDecodeError, ValueError) as e:
             print(f"Parsing error (attempt {retries + 1}/{max_retries}): {e}")
             retries += 1
 
             if retries < max_retries:
-                # If parsing fails, ask the model to correct the format.
-                correction_prompt = ChatPromptTemplate.from_template("Your previous response could not be parsed. Original prompt: {original_prompt}\nInvalid response: {invalid_response}\nPlease provide ONLY a valid JSON object with 'description' and 'tests', using double quotes for keys and string values.")
-                correction_chain = correction_prompt | llm | StrOutputParser()
-                generated_content = correction_chain.invoke({"original_prompt": prompt.messages[0].prompt.template, "invalid_response": generated_content})
+                # Retry with explicit instructions to fix the format
+                retry_messages = [
+                    {"role": "user", "content": prompt},
+                    {"role": "assistant", "content": generated_content},
+                    {"role": "user", "content": "The response could not be parsed correctly. Please provide a valid JSON object with 'description' and 'tests' fields only. Make sure to use double quotes for keys and string values."}
+                ]
+
+                retry_response = openai.chat.completions.create(
+                    model="gpt-4o",
+                    messages=retry_messages,
+                    response_format={"type": "json_object"}
+                )
+
+                generated_content = retry_response.choices[0].message.content
             else:
                 print(f"Failed to parse response after {max_retries} attempts")
                 # Fallback to a simple problem
-                problem = Problem(description="Add two space-separated integers", tests=[{"input": "5 3", "output": "8"}])
+                problem = Problem(
+                    description="Add two space-separated integers",
+                    tests=[{"input": "5 3", "output": "8"}]
+                )
                 break
 
     if not success and not problem:
-        # Fallback if loop finishes without success
-        problem = Problem(description="Add two space-separated integers", tests=[{"input": "5 3", "output": "8"}])
+        # Fallback if all else fails
+        problem = Problem(
+            description="Add two space-separated integers",
+            tests=[{"input": "5 3", "output": "8"}]
+        )
 
     state["problem"] = problem
     state["code_attempts"] = 0  # Reset for new problem
@@ -288,6 +343,35 @@ def save_graph_visualization() -> None:
         f.write(png_data)
 
     print(f"✅ PNG diagram saved to: {png_path}")
+
+
+def generate_llm_prompt(topic: str, difficulty: str, retrieved_problems: list) -> str:
+    """Creates a detailed prompt for the LLM using RAG approach."""
+    prompt = f"You are an expert problem setter for a technical interview platform.\n"
+    prompt += f"Your task is to create a new, unique programming problem on the topic of '{topic.title()}' with a '{difficulty.upper()}' difficulty level.\n\n"
+    prompt += "To help you, here are some examples of existing problems on the same topic. Do NOT copy them directly. Use them as inspiration for style, structure, and difficulty.\n\n"
+    prompt += "--- EXAMPLES ---\n"
+    for i, prob in enumerate(retrieved_problems):
+        prompt += f"Example {i + 1}:\n"
+        prompt += f"Title: {prob['metadatas']['name']}\n"
+        prompt += f"Description: {prob['documents']}\n\n"
+    prompt += "--- END OF EXAMPLES ---\n\n"
+    prompt += (
+        "Now, generate a brand new problem. The problem should be in a JSON format with the following structure:\n"
+        "{\n"
+        "  'description': '...',  // Detailed problem description\n"
+        "  'tests': [\n"
+        "    {\n"
+        "      'input': '...',\n"
+        "      'output': '...'\n"
+        "    },\n"
+        "    // You can include multiple examples\n"
+        "  ]\n"
+        "}\n"
+        "Make sure your problem is unique and appropriate for the difficulty level. Include at least two test cases with input and output examples.\n"
+    )
+
+    return prompt
 
 
 # Example usage
