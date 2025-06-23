@@ -1,14 +1,12 @@
 # ml/rag_pipeline.py
 import os
 import json
+
+from dotenv import load_dotenv
+
 from app.api.schemas import ProblemRequest, ProblemResponse
 from ml.embedding_generator import problem_collection
-
-# Import the official Mistral AI client
-from mistralai.client import MistralClient
-from mistralai.models.chat_completion import ChatMessage
-from dotenv import load_dotenv
-load_dotenv()
+import openai
 
 # The generate_llm_prompt function remains the same as before.
 def generate_llm_prompt(topic: str, difficulty: str, retrieved_problems: list) -> str:
@@ -50,7 +48,7 @@ def generate_llm_prompt(topic: str, difficulty: str, retrieved_problems: list) -
 
 async def generate_new_problem(request: ProblemRequest) -> ProblemResponse:
     """
-    The main RAG pipeline function using the Mistral AI client.
+    The main RAG pipeline function using the OpenAI API.
     """
 
     query_text = f"{request.topic.value} {request.difficulty.value} {request.user_prompt}"
@@ -66,22 +64,23 @@ async def generate_new_problem(request: ProblemRequest) -> ProblemResponse:
     ]
 
     prompt = generate_llm_prompt(request.topic.value, request.difficulty.value, retrieved_problems)
-
-    api_key = os.getenv("MISTRAL_API_KEY")
-    client = MistralClient(api_key=api_key)
-
-    model_name = "mistral-tiny"
+    load_dotenv()
+    api_key = os.getenv("OPENAI_API_KEY")
+    openai.api_key = api_key
+    model_name = "gpt-4o"
 
     messages = [
-        ChatMessage(role="user", content=prompt)
+        {"role": "user", "content": prompt}
     ]
 
-    chat_response = client.chat(
+    response = openai.chat.completions.create(
         model=model_name,
         messages=messages,
+        response_format={"type": "json_object"}
     )
+    print(response.choices[0].message.content)
+    generated_content = response.choices[0].message.content
     import ast
-    generated_content = chat_response.choices[0].message.content
     max_retries = 10
     retries = 0
     success = False
@@ -96,14 +95,11 @@ async def generate_new_problem(request: ProblemRequest) -> ProblemResponse:
 
             if retries < max_retries:
                 retry_messages = messages.copy()
-                retry_messages.append(ChatMessage(role="assistant", content=generated_content))
-                retry_messages.append(ChatMessage(role="user",
-                                                  content="Your previous response couldn't be parsed. Please provide ONLY a valid Python dictionary with the problem data, without any additional text or formatting."))
-
-                chat_response = client.chat(
-                    model=model_name,
-                    messages=retry_messages,
-                )
+                chat_response = openai.chat.completions.create(
+        model=model_name,
+        messages=retry_messages,
+        response_format={"type": "json_object"}
+    )
                 generated_content = chat_response.choices[0].message.content
             else:
                 print(f"Failed to parse response after {max_retries} attempts")
