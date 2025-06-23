@@ -19,6 +19,7 @@ Environment Variables Required:
 - E2B_API_KEY: Your E2B sandbox API key
 """
 
+import json
 import os
 import re
 from typing import Optional, TypedDict
@@ -27,14 +28,15 @@ from dotenv import load_dotenv
 from e2b_code_interpreter import Sandbox  # type: ignore
 from langchain.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from langchain_mistralai import ChatMistralAI
+from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 from pydantic import BaseModel
 
 from app.api.schemas import DifficultyLevel, ProblemTopic
 
 # Load environment variables from .env file
-load_dotenv()
+dotenv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env")
+load_dotenv(dotenv_path=dotenv_path)
 
 
 # Define the Problem structure
@@ -62,44 +64,61 @@ def create_initial_state(user_prompt: str, topic: ProblemTopic, difficulty: Diff
 
 # Initialize LLM and sandbox (in practice, add your API keys)
 # Make sure to set your MISTRAL_API_KEY environment variable
-llm = ChatMistralAI(model_name="mistral-tiny")
+# llm = ChatMistralAI(model_name="mistral-tiny")
+
+# Initialize OpenAI API
+llm = ChatOpenAI(model_name="gpt-4", openai_api_key=os.getenv("OPENAI_API_KEY"))
 # Note: E2B requires an API key, set E2B_API_KEY environment variable
 sandbox = Sandbox(api_key=os.getenv("E2B_API_KEY"))
 
 
 # Node functions
 def problem_agent(state: SessionState) -> SessionState:
-    prompt = ChatPromptTemplate.from_template(
-        "Generate a programming problem with User input: {user_prompt}. "
-        "Topic from user  prompt: {topic}. "
-        "Difficulty level from user prompt: {difficulty}. "
-        "The problem should be solvable with a Python function that reads from stdin and writes to stdout. "
-        "For inputs with multiple values, use space-separated format on a single line. "
-        "Return JSON with 'description' (string) and 'tests' (array of objects with 'input' and 'output' as strings). "
-        "Example: {{'description': 'Add two space-separated numbers', 'tests': [{{'input': '5 3', 'output': '8'}}]}}"
-    )
+    # Create a valid JSON example to guide the LLM
+    example_json = '{{"description": "Add two space-separated numbers", "tests": [{{"input": "5 3", "output": "8"}}]}}'
+
+    prompt_template = f"Generate a programming problem with User input: {{user_prompt}}. Topic from user  prompt: {{topic}}. Difficulty level from user prompt: {{difficulty}}. The problem should be solvable with a Python function that reads from stdin and writes to stdout. For inputs with multiple values, use space-separated format on a single line. Return JSON with 'description' (string) and 'tests' (array of objects with 'input' and 'output' as strings). Example: {example_json}"
+    prompt = ChatPromptTemplate.from_template(prompt_template)
 
     # Instead of using PydanticOutputParser, let's handle JSON manually
     chain = prompt | llm | StrOutputParser()
 
-    try:
-        response = chain.invoke({"user_prompt": state["user_prompt"], "topic": state["topic"].value, "difficulty": state["difficulty"].value})
-        # Try to extract JSON from the response
-        import json
-        import re
+    generated_content = chain.invoke({"user_prompt": state["user_prompt"], "topic": state["topic"].value, "difficulty": state["difficulty"].value})
 
-        json_match = re.search(r"\{.*\}", response, re.DOTALL)
-        if json_match:
-            json_str = json_match.group()
-            problem_data = json.loads(json_str)
-            problem = Problem(description=problem_data["description"], tests=problem_data["tests"])
-        else:
-            # Fallback: create a simple math problem
-            problem = Problem(description="Add two space-separated integers", tests=[{"input": "5 3", "output": "8"}])
+    max_retries = 10
+    retries = 0
+    success = False
+    problem = None
 
-    except Exception as e:
-        print(f"Error parsing problem: {e}")
-        # Fallback: create a simple math problem
+    while retries < max_retries and not success:
+        try:
+            # Try to extract JSON from the response
+            json_match = re.search(r"\{.*\}", generated_content, re.DOTALL)
+            if json_match:
+                problem_str = json_match.group(0)
+                problem_dict = json.loads(problem_str)
+                problem = Problem(**problem_dict)
+                success = True
+            else:
+                raise ValueError("No JSON object found in the response")
+
+        except (json.JSONDecodeError, ValueError) as e:
+            print(f"Parsing error (attempt {retries + 1}/{max_retries}): {e}")
+            retries += 1
+
+            if retries < max_retries:
+                # If parsing fails, ask the model to correct the format.
+                correction_prompt = ChatPromptTemplate.from_template("Your previous response could not be parsed. Original prompt: {original_prompt}\nInvalid response: {invalid_response}\nPlease provide ONLY a valid JSON object with 'description' and 'tests', using double quotes for keys and string values.")
+                correction_chain = correction_prompt | llm | StrOutputParser()
+                generated_content = correction_chain.invoke({"original_prompt": prompt.messages[0].prompt.template, "invalid_response": generated_content})
+            else:
+                print(f"Failed to parse response after {max_retries} attempts")
+                # Fallback to a simple problem
+                problem = Problem(description="Add two space-separated integers", tests=[{"input": "5 3", "output": "8"}])
+                break
+
+    if not success and not problem:
+        # Fallback if loop finishes without success
         problem = Problem(description="Add two space-separated integers", tests=[{"input": "5 3", "output": "8"}])
 
     state["problem"] = problem
@@ -167,8 +186,9 @@ def run_tests(state: SessionState) -> SessionState:
         # Try E2B sandbox
         try:
             test_input = test["input"]
+            print(test_input)
             sandbox.files.write("tests.txt", test_input)
-            execution = sandbox.run_code(code, input_files=["tests.txt"])
+            execution = sandbox.run_code(code, test["input"])
             print(f"E2B execution logs: {execution.logs}")
 
             if execution.logs.stdout:
@@ -278,12 +298,13 @@ if __name__ == "__main__":
     # print("📊 Saving workflow graph visualization...")
     # save_graph_visualization()
 
-    initial_state = create_initial_state(user_prompt="Generate a math problem for data engeineering intern", topic=ProblemTopic.STRINGS, difficulty=DifficultyLevel.EASY)
+    initial_state = create_initial_state(user_prompt="Generate a DP problem for data engeineering intern", topic=ProblemTopic.DYNAMIC_PROGRAMMING, difficulty=DifficultyLevel.EASY)
 
     try:
         # Run the workflow
         final_state = app.invoke(initial_state)
-
+        print("state:")
+        print(final_state)
         print(f"Tests passed: {final_state['tests_passed']}")
         print(f"Code attempts: {final_state['code_attempts']}")
         print(f"Problem attempts: {final_state['problem_attempts']}")
