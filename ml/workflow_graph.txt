@@ -1,0 +1,59 @@
+
+AI Agent Workflow Graph
+======================
+
+┌─────────────────┐
+│  problem_agent  │  ← START
+└─────────┬───────┘
+          │
+          ▼
+┌─────────────────┐
+│   code_agent    │
+└─────────┬───────┘
+          │
+          ▼
+┌─────────────────┐
+│   run_tests     │
+└─────────┬───────┘
+          │
+          ▼
+     Decision Point:
+     ┌─────────────┐
+     │ Tests Pass? │
+     └─────┬───────┘
+           │
+     ┌─────▼─────┐
+     │    YES    │─────► END ✅
+     └───────────┘
+           │
+     ┌─────▼─────┐
+     │     NO    │
+     └─────┬─────┘
+           │
+     ┌─────▼─────────────────────┐
+     │ Code attempts < 5?        │
+     └─────┬─────────────────────┘
+           │
+     ┌─────▼─────┐    ┌─────▼─────┐
+     │    YES    │    │     NO    │
+     └─────┬─────┘    └─────┬─────┘
+           │                │
+           ▼                ▼
+    ┌─────────────┐  ┌─────────────────────────┐
+    │ code_agent  │  │ Problem attempts < 2?   │
+    └─────────────┘  └─────┬───────────────────┘
+                           │
+                     ┌─────▼─────┐    ┌─────▼─────┐
+                     │    YES    │    │     NO    │
+                     └─────┬─────┘    └─────┬─────┘
+                           │                │
+                           ▼                ▼
+                    ┌─────────────┐      END ❌
+                    │problem_agent│
+                    └─────────────┘
+
+Legend:
+- problem_agent: Generates programming problems
+- code_agent: Writes code to solve problems
+- run_tests: Tests generated code
+- Decision logic handles retries and failures
