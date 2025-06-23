@@ -32,6 +32,7 @@ dependencies = [
     "pydantic_core",
     "typing_extensions",
     "typing_inspection",
+    "openai>=1.90.0",
 ]
 
 [project.optional-dependencies]
