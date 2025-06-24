@@ -10,6 +10,7 @@ from langgraph.graph import END, StateGraph
 from app.api.schemas import DifficultyLevel, ProblemTopic
 import openai
 from models.state import SessionState, Problem
+
 from ml.rag_retriever import default_retriever as rag_retriever
 
 dotenv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env")
@@ -18,38 +19,31 @@ load_dotenv(dotenv_path=dotenv_path)
 
 def create_initial_state(user_prompt: str, topic: ProblemTopic, difficulty: DifficultyLevel) -> SessionState:
     """Create initial state dictionary."""
-    return SessionState(user_prompt=user_prompt, topic=topic, difficulty=difficulty, problem=None, code=None, tests_passed=False, code_attempts=0, problem_attempts=0)
+    return SessionState(user_prompt=user_prompt, topic=topic, difficulty=difficulty, problem=None, code=None,
+                        tests_passed=False, code_attempts=0, problem_attempts=0)
 
 
 llm = ChatOpenAI(model_name="gpt-4", openai_api_key=os.getenv("OPENAI_API_KEY"))
 
 sandbox = Sandbox(api_key=os.getenv("E2B_API_KEY"))
 
+
 def problem_agent(state: SessionState) -> SessionState:
     """Generate programming problems using RAG approach."""
     openai.api_key = os.getenv("OPENAI_API_KEY")
 
     # Use the RAG retriever to get similar problems
-    retrieved_problems = rag_retriever.retrieve(
-        topic=state["topic"].value,
-        difficulty=state["difficulty"].value,
-        user_prompt=state["user_prompt"]
-    )
+    retrieved_problems = rag_retriever.retrieve(topic=state["topic"].value, difficulty=state["difficulty"].value,
+        user_prompt=state["user_prompt"])
 
     # Generate a prompt using the retrieved problems
-    prompt = rag_retriever.generate_prompt(
-        topic=state["topic"].value,
-        difficulty=state["difficulty"].value,
-        retrieved_problems=retrieved_problems
-    )
+    prompt = rag_retriever.generate_prompt(topic=state["topic"].value, difficulty=state["difficulty"].value,
+        retrieved_problems=retrieved_problems)
 
     messages = [{"role": "user", "content": prompt}]
 
-    response = openai.chat.completions.create(
-        model="gpt-4o",
-        messages=messages,
-        response_format={"type": "json_object"}
-    )
+    response = openai.chat.completions.create(model="gpt-4o", messages=messages,
+        response_format={"type": "json_object"})
 
     generated_content = response.choices[0].message.content
     print(f"Generated content: {generated_content}")
@@ -88,34 +82,24 @@ def problem_agent(state: SessionState) -> SessionState:
 
             if retries < max_retries:
                 # Retry with explicit instructions to fix the format
-                retry_messages = [
-                    {"role": "user", "content": prompt},
-                    {"role": "assistant", "content": generated_content},
-                    {"role": "user", "content": "The response could not be parsed correctly. Please provide a valid JSON object with 'description' and 'tests' fields only. Make sure to use double quotes for keys and string values."}
-                ]
+                retry_messages = [{"role": "user", "content": prompt},
+                    {"role": "assistant", "content": generated_content}, {"role": "user",
+                                                                          "content": "The response could not be parsed correctly. Please provide a valid JSON object with 'description' and 'tests' fields only. Make sure to use double quotes for keys and string values."}]
 
-                retry_response = openai.chat.completions.create(
-                    model="gpt-4o",
-                    messages=retry_messages,
-                    response_format={"type": "json_object"}
-                )
+                retry_response = openai.chat.completions.create(model="gpt-4o", messages=retry_messages,
+                    response_format={"type": "json_object"})
 
                 generated_content = retry_response.choices[0].message.content
             else:
                 print(f"Failed to parse response after {max_retries} attempts")
                 # Fallback to a simple problem
-                problem = Problem(
-                    description="Add two space-separated integers",
-                    tests=[{"input": "5 3", "output": "8"}]
-                )
+                problem = Problem(description="Add two space-separated integers",
+                    tests=[{"input": "5 3", "output": "8"}])
                 break
 
     if not success and not problem:
         # Fallback if all else fails
-        problem = Problem(
-            description="Add two space-separated integers",
-            tests=[{"input": "5 3", "output": "8"}]
-        )
+        problem = Problem(description="Add two space-separated integers", tests=[{"input": "5 3", "output": "8"}])
 
     state["problem"] = problem
     state["code_attempts"] = 0  # Reset for new problem
@@ -127,7 +111,8 @@ def code_agent(state: SessionState) -> SessionState:
     if state["problem"] is None:
         raise ValueError("Problem must be set before generating code")
 
-    prompt = ChatPromptTemplate.from_template("Write a Python solution for: {problem_description}. The solution should read input from stdin and write output to stdout. If the input contains multiple values, they will be space-separated on a single line. Use input().split() to parse space-separated values. Return ONLY the Python code, no markdown formatting, no explanations. Example for adding two numbers: a, b = map(int, input().split())\nprint(a + b)")
+    prompt = ChatPromptTemplate.from_template(
+        "Write a Python solution for: {problem_description}. The solution should read input from stdin and write output to stdout. If the input contains multiple values, they will be space-separated on a single line. Use input().split() to parse space-separated values. Return ONLY the Python code, no markdown formatting, no explanations. Example for adding two numbers: a, b = map(int, input().split())\nprint(a + b)")
     chain = prompt | llm | StrOutputParser()
     code = chain.invoke({"problem_description": state["problem"].description})
 
@@ -203,7 +188,8 @@ def run_tests(state: SessionState) -> SessionState:
                 f.write(code)
                 temp_file = f.name
 
-            process = subprocess.run([sys.executable, temp_file], input=test["input"], capture_output=True, text=True, timeout=5)
+            process = subprocess.run([sys.executable, temp_file], input=test["input"], capture_output=True, text=True,
+                                     timeout=5)
 
             os.unlink(temp_file)
 
@@ -221,6 +207,7 @@ def run_tests(state: SessionState) -> SessionState:
         state["tests_passed"] = False
 
     return state
+
 
 def should_continue_coding(state: SessionState) -> bool:
     return not state["tests_passed"] and state["code_attempts"] < 5
@@ -245,7 +232,9 @@ workflow.set_entry_point("problem_agent")
 workflow.add_edge("problem_agent", "code_agent")
 workflow.add_edge("code_agent", "run_tests")
 
-workflow.add_conditional_edges("run_tests", lambda state: "end" if should_end(state) else ("code_agent" if should_continue_coding(state) else "problem_agent"), {"end": END, "code_agent": "code_agent", "problem_agent": "problem_agent"})
+workflow.add_conditional_edges("run_tests", lambda state: "end" if should_end(state) else (
+    "code_agent" if should_continue_coding(state) else "problem_agent"),
+                               {"end": END, "code_agent": "code_agent", "problem_agent": "problem_agent"})
 
 app = workflow.compile()
 
@@ -262,4 +251,3 @@ def save_graph_visualization() -> None:
         f.write(png_data)
 
     print(f"✅ PNG diagram saved to: {png_path}")
-
