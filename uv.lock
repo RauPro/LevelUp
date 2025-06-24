@@ -834,6 +834,38 @@ wheels = [
 ]
 
 [[package]]
+name = "e2b"
+version = "1.5.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "attrs" },
+    { name = "httpcore" },
+    { name = "httpx" },
+    { name = "packaging" },
+    { name = "protobuf" },
+    { name = "python-dateutil" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/6b/b3/e5f89ea7adab8651d3258e5ddd0f0cbcddf441ab5a8f3c108e7e2faef1a3/e2b-1.5.2.tar.gz", hash = "sha256:29ed891ae04ffafff1744c57eff55901200f15030d34ac3fe76d6672e2bf7845", size = 55815, upload-time = "2025-06-16T18:46:23.174Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/38/a9/48feaa1c41af3d480d97ecfab3d32228692dae8c3e6bd49ac36fd80010d3/e2b-1.5.2-py3-none-any.whl", hash = "sha256:8cf755f2ff04098daa7ac778f768eee1df730a6181637fe124210345999890b3", size = 104069, upload-time = "2025-06-16T18:46:21.538Z" },
+]
+
+[[package]]
+name = "e2b-code-interpreter"
+version = "1.5.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "attrs" },
+    { name = "e2b" },
+    { name = "httpx" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c3/d5/96675abbe490b8d65f983423c3650f673b7afe7148ccb17076d067af3b3e/e2b_code_interpreter-1.5.1.tar.gz", hash = "sha256:e39485dd2ffb148a902e8c05c8f573feeb7ca87f8498f02a4db65630e76364e1", size = 10003, upload-time = "2025-06-05T14:37:59.803Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f9/cf/0327567e9ce1c73183f652b7818ee699462b8b6bf5605a7675a4c0e63cbf/e2b_code_interpreter-1.5.1-py3-none-any.whl", hash = "sha256:c8ee6f77bcb9c53422df336abbd37d5bf6318c3967b87444b39e3428a54c5e08", size = 12872, upload-time = "2025-06-05T14:37:58.215Z" },
+]
+
+[[package]]
 name = "eval-type-backport"
 version = "0.2.2"
 source = { registry = "https://pypi.org/simple" }
@@ -2009,6 +2041,7 @@ dependencies = [
     { name = "chromadb" },
     { name = "click" },
     { name = "datasets" },
+    { name = "e2b-code-interpreter" },
     { name = "fastapi" },
     { name = "h11" },
     { name = "httpx" },
@@ -2046,6 +2079,7 @@ requires-dist = [
     { name = "chromadb", specifier = ">=0.4.15" },
     { name = "click" },
     { name = "datasets", specifier = ">=3.1.0" },
+    { name = "e2b-code-interpreter" },
     { name = "fastapi", specifier = ">=0.104.1" },
     { name = "h11" },
     { name = "httpx", specifier = ">=0.25.1" },

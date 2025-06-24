@@ -186,3 +186,12 @@ Desktop.ini
 .dvc/cache
 /data/chroma_db/
 /data/hf_cache/
+
+# MLflow
+mlruns/
+mlartifacts/
+
+.env
+.env.local
+.env.test
+.env.production

@@ -12,8 +12,10 @@ from app.api.schemas import (
     ProblemResponse,
     ProblemTopic,
 )
+from evaluation.eval_mlflow import log_session_state
+from ml.agent import app as agent_app
+from ml.agent import create_initial_state
 from pipelines.rag_pipeline import generate_new_problem
-from ml.agent import create_initial_state, app as agent_app, Problem
 
 router = APIRouter()
 
@@ -116,6 +118,7 @@ async def generate_verified_problem(request: ProblemRequest) -> dict:
         # Run the LangGraph workflow
         final_state = agent_app.invoke(initial_state)
 
+        log_session_state(final_state)
         # Check if tests passed
         if not final_state["tests_passed"]:
             raise ValueError("Could not generate a problem with passing test cases")
