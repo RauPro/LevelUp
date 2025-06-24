@@ -1,31 +1,10 @@
-"""
-AI-Powered Programming Problem Generator and Solver
-
-This module implements a LangGraph workflow that:
-1. Generates programming problems based on user user_prompt
-2. Writes code to solve the problems
-3. Tests the code in a sandbox environment
-4. Iteratively improves until tests pass or max attempts reached
-
-Dependencies:
-- langgraph: For workflow orchestration
-- langchain-mistralai: For LLM integration
-- langchain-core: For core LangChain functionality
-- e2b-code-interpreter: For code execution sandbox
-- pydantic: For data validation
-
-Environment Variables Required:
-- MISTRAL_API_KEY: Your Mistral AI API key
-- E2B_API_KEY: Your E2B sandbox API key
-"""
-
 import json
 import os
 import re
 from typing import Optional, TypedDict
 
 from dotenv import load_dotenv
-from e2b_code_interpreter import Sandbox  # type: ignore
+from e2b_code_interpreter import Sandbox
 from langchain.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_openai import ChatOpenAI
@@ -33,21 +12,17 @@ from langgraph.graph import END, StateGraph
 from pydantic import BaseModel
 
 from app.api.schemas import DifficultyLevel, ProblemTopic
-from ml.embedding_generator import problem_collection  # Import problem_collection for RAG
-import openai  # Import OpenAI for RAG approach
+from ml.embedding_generator import problem_collection
+import openai
 
-# Load environment variables from .env file
 dotenv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env")
 load_dotenv(dotenv_path=dotenv_path)
 
-
-# Define the Problem structure
 class Problem(BaseModel):
     description: str
     tests: list[dict[str, str]]
 
 
-# Define the state to track progress using TypedDict for LangGraph compatibility
 class SessionState(TypedDict):
     user_prompt: str
     topic: ProblemTopic
@@ -64,55 +39,39 @@ def create_initial_state(user_prompt: str, topic: ProblemTopic, difficulty: Diff
     return SessionState(user_prompt=user_prompt, topic=topic, difficulty=difficulty, problem=None, code=None, tests_passed=False, code_attempts=0, problem_attempts=0)
 
 
-# Initialize LLM and sandbox (in practice, add your API keys)
-# Make sure to set your MISTRAL_API_KEY environment variable
-# llm = ChatMistralAI(model_name="mistral-tiny")
-
-# Initialize OpenAI API
 llm = ChatOpenAI(model_name="gpt-4", openai_api_key=os.getenv("OPENAI_API_KEY"))
-# Note: E2B requires an API key, set E2B_API_KEY environment variable
+
 sandbox = Sandbox(api_key=os.getenv("E2B_API_KEY"))
 
-
-# Node functions
 def problem_agent(state: SessionState) -> SessionState:
     """Generate programming problems using RAG approach."""
-    # Load OpenAI API key
     openai.api_key = os.getenv("OPENAI_API_KEY")
 
-    # Create a search query from the user input and topic
     query_text = f"{state['topic'].value} {state['difficulty'].value} {state['user_prompt']}"
 
-    # Retrieve similar problems from the vector database
     retrieved = problem_collection.query(
         query_texts=[query_text],
         n_results=3,
     )
 
-    # Format the retrieved problems for the prompt
     retrieved_problems = [
         {"documents": doc, "metadatas": meta}
         for doc, meta in zip(retrieved["documents"][0], retrieved["metadatas"][0])
     ]
 
-    # Generate the prompt using the RAG approach
     prompt = generate_llm_prompt(state["topic"].value, state["difficulty"].value, retrieved_problems)
 
-    # Create messages for the OpenAI API
     messages = [{"role": "user", "content": prompt}]
 
-    # Call the OpenAI API
     response = openai.chat.completions.create(
-        model="gpt-4o",  # Using GPT-4o for better problem generation
+        model="gpt-4o",
         messages=messages,
         response_format={"type": "json_object"}
     )
 
-    # Get the generated content
     generated_content = response.choices[0].message.content
     print(f"Generated content: {generated_content}")
 
-    # Parse the JSON response
     max_retries = 10
     retries = 0
     success = False
@@ -190,17 +149,13 @@ def code_agent(state: SessionState) -> SessionState:
     chain = prompt | llm | StrOutputParser()
     code = chain.invoke({"problem_description": state["problem"].description})
 
-    # Clean the code by removing markdown formatting and extra text
     if "```python" in code:
-        # Extract code from markdown
         code_match = re.search(r"```python\n(.*?)\n```", code, re.DOTALL)
         if code_match:
             code = code_match.group(1)
     elif "```" in code:
-        # Remove any other code blocks
         code = re.sub(r"```.*?\n(.*?)\n```", r"\1", code, flags=re.DOTALL)
 
-    # Remove common explanatory text
     lines = code.split("\n")
     clean_lines = []
     for line in lines:
@@ -226,9 +181,8 @@ def run_tests(state: SessionState) -> SessionState:
         return state
 
     code = state["code"]
-    test = state["problem"].tests[0]  # Single test for simplicity
+    test = state["problem"].tests[0]
 
-    # Clean the code by removing markdown formatting
     if "```python" in code:
         code_match = re.search(r"```python\n(.*?)\n```", code, re.DOTALL)
         if code_match:
@@ -236,9 +190,7 @@ def run_tests(state: SessionState) -> SessionState:
     elif "```" in code:
         code = re.sub(r"```.*?\n(.*?)\n```", r"\1", code, flags=re.DOTALL)
     print(f"Running code:\n{code}\nWith test input: '{test['input']}' and expected output: '{test['output']}'")
-    # Try E2B sandbox first, fallback to local execution
     try:
-        # Try E2B sandbox
         try:
             test_input = test["input"]
             print(test_input)
@@ -258,7 +210,6 @@ def run_tests(state: SessionState) -> SessionState:
         except Exception as e2b_error:
             print(f"E2B execution failed: {e2b_error}, falling back to local execution...")
 
-            # Fallback to local execution
             import os
             import subprocess
             import sys
@@ -266,18 +217,14 @@ def run_tests(state: SessionState) -> SessionState:
 
             print(f"Running test locally with input: '{test['input']}'")
 
-            # Create a temporary file with the code
             with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
                 f.write(code)
                 temp_file = f.name
 
-            # Run the code with test input
             process = subprocess.run([sys.executable, temp_file], input=test["input"], capture_output=True, text=True, timeout=5)
 
-            # Clean up temp file
             os.unlink(temp_file)
 
-            # Check results
             if process.returncode == 0:
                 output = process.stdout.strip()
                 expected = test["output"].strip()
@@ -293,8 +240,6 @@ def run_tests(state: SessionState) -> SessionState:
 
     return state
 
-
-# Build the graph
 def should_continue_coding(state: SessionState) -> bool:
     return not state["tests_passed"] and state["code_attempts"] < 5
 
@@ -307,35 +252,27 @@ def should_end(state: SessionState) -> bool:
     return state["tests_passed"] or state["problem_attempts"] >= 2
 
 
-# Create the state graph
 workflow = StateGraph(SessionState)
 
-# Add nodes
 workflow.add_node("problem_agent", problem_agent)
 workflow.add_node("code_agent", code_agent)
 workflow.add_node("run_tests", run_tests)
 
-# Set entry point
 workflow.set_entry_point("problem_agent")
 
-# Add edges
 workflow.add_edge("problem_agent", "code_agent")
 workflow.add_edge("code_agent", "run_tests")
 
-# Add conditional edges
 workflow.add_conditional_edges("run_tests", lambda state: "end" if should_end(state) else ("code_agent" if should_continue_coding(state) else "problem_agent"), {"end": END, "code_agent": "code_agent", "problem_agent": "problem_agent"})
 
-# Compile the graph
 app = workflow.compile()
 
 
 def save_graph_visualization() -> None:
     """Save the workflow graph as PNG, Mermaid diagram and ASCII representation."""
 
-    # Get the graph object
     graph = app.get_graph(xray=True)
 
-    # Save PNG directly using LangGraph's built-in method
     png_path = os.path.join(os.path.dirname(__file__), "workflow_graph.png")
     png_data = graph.draw_mermaid_png()
 
@@ -374,18 +311,11 @@ def generate_llm_prompt(topic: str, difficulty: str, retrieved_problems: list) -
     return prompt
 
 
-# Example usage
 if __name__ == "__main__":
-    # Note: Environment variables are loaded from .env file
-
-    # # Save the graph visualization first
-    # print("📊 Saving workflow graph visualization...")
-    # save_graph_visualization()
 
     initial_state = create_initial_state(user_prompt="Generate a DP problem for data engeineering intern", topic=ProblemTopic.DYNAMIC_PROGRAMMING, difficulty=DifficultyLevel.EASY)
 
     try:
-        # Run the workflow
         final_state = app.invoke(initial_state)
         print("state:")
         print(final_state)
