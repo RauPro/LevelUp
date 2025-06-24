@@ -133,7 +133,7 @@ if __name__ == "__main__":
     # Create a new instance to test persistence
     test_gen = EmbeddingGenerator()
     count = test_gen.get_collection_info()
-
+    print(count)
     # If you want to test with sample data, uncomment below:
     # sample_df = pd.DataFrame({
     #     'problem-description': ['Sample problem 1', 'Sample problem 2'],

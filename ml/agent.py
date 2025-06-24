@@ -1,37 +1,19 @@
 import json
 import os
 import re
-from typing import Optional, TypedDict
-
 from dotenv import load_dotenv
 from e2b_code_interpreter import Sandbox
 from langchain.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
-from pydantic import BaseModel
-
 from app.api.schemas import DifficultyLevel, ProblemTopic
-from ml.embedding_generator import problem_collection
 import openai
+from models.state import SessionState, Problem
+from ml.rag_retriever import default_retriever as rag_retriever
 
 dotenv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env")
 load_dotenv(dotenv_path=dotenv_path)
-
-class Problem(BaseModel):
-    description: str
-    tests: list[dict[str, str]]
-
-
-class SessionState(TypedDict):
-    user_prompt: str
-    topic: ProblemTopic
-    difficulty: DifficultyLevel
-    problem: Optional[Problem]
-    code: Optional[str]
-    tests_passed: bool
-    code_attempts: int
-    problem_attempts: int
 
 
 def create_initial_state(user_prompt: str, topic: ProblemTopic, difficulty: DifficultyLevel) -> SessionState:
@@ -47,19 +29,19 @@ def problem_agent(state: SessionState) -> SessionState:
     """Generate programming problems using RAG approach."""
     openai.api_key = os.getenv("OPENAI_API_KEY")
 
-    query_text = f"{state['topic'].value} {state['difficulty'].value} {state['user_prompt']}"
-
-    retrieved = problem_collection.query(
-        query_texts=[query_text],
-        n_results=3,
+    # Use the RAG retriever to get similar problems
+    retrieved_problems = rag_retriever.retrieve(
+        topic=state["topic"].value,
+        difficulty=state["difficulty"].value,
+        user_prompt=state["user_prompt"]
     )
 
-    retrieved_problems = [
-        {"documents": doc, "metadatas": meta}
-        for doc, meta in zip(retrieved["documents"][0], retrieved["metadatas"][0])
-    ]
-
-    prompt = generate_llm_prompt(state["topic"].value, state["difficulty"].value, retrieved_problems)
+    # Generate a prompt using the retrieved problems
+    prompt = rag_retriever.generate_prompt(
+        topic=state["topic"].value,
+        difficulty=state["difficulty"].value,
+        retrieved_problems=retrieved_problems
+    )
 
     messages = [{"role": "user", "content": prompt}]
 
@@ -281,55 +263,3 @@ def save_graph_visualization() -> None:
 
     print(f"✅ PNG diagram saved to: {png_path}")
 
-
-def generate_llm_prompt(topic: str, difficulty: str, retrieved_problems: list) -> str:
-    """Creates a detailed prompt for the LLM using RAG approach."""
-    prompt = f"You are an expert problem setter for a technical interview platform.\n"
-    prompt += f"Your task is to create a new, unique programming problem on the topic of '{topic.title()}' with a '{difficulty.upper()}' difficulty level.\n\n"
-    prompt += "To help you, here are some examples of existing problems on the same topic. Do NOT copy them directly. Use them as inspiration for style, structure, and difficulty.\n\n"
-    prompt += "--- EXAMPLES ---\n"
-    for i, prob in enumerate(retrieved_problems):
-        prompt += f"Example {i + 1}:\n"
-        prompt += f"Title: {prob['metadatas']['name']}\n"
-        prompt += f"Description: {prob['documents']}\n\n"
-    prompt += "--- END OF EXAMPLES ---\n\n"
-    prompt += (
-        "Now, generate a brand new problem. The problem should be in a JSON format with the following structure:\n"
-        "{\n"
-        "  'description': '...',  // Detailed problem description\n"
-        "  'tests': [\n"
-        "    {\n"
-        "      'input': '...',\n"
-        "      'output': '...'\n"
-        "    },\n"
-        "    // You can include multiple examples\n"
-        "  ]\n"
-        "}\n"
-        "Make sure your problem is unique and appropriate for the difficulty level. Include at least two test cases with input and output examples.\n"
-    )
-
-    return prompt
-
-
-if __name__ == "__main__":
-
-    initial_state = create_initial_state(user_prompt="Generate a DP problem for data engeineering intern", topic=ProblemTopic.DYNAMIC_PROGRAMMING, difficulty=DifficultyLevel.EASY)
-
-    try:
-        final_state = app.invoke(initial_state)
-        print("state:")
-        print(final_state)
-        print(f"Tests passed: {final_state['tests_passed']}")
-        print(f"Code attempts: {final_state['code_attempts']}")
-        print(f"Problem attempts: {final_state['problem_attempts']}")
-        print(f"Final code:\n{final_state['code']}")
-
-        if final_state["problem"]:
-            print(f"\nProblem description: {final_state['problem'].description}")
-            print(f"Tests: {final_state['problem'].tests}")
-
-    except Exception as e:
-        print(f"Error running workflow: {e}")
-        print("Make sure you have set the required environment variables:")
-        print("- MISTRAL_API_KEY")
-        print("- E2B_API_KEY")
