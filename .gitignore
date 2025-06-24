@@ -184,3 +184,5 @@ Desktop.ini
 
 # DVC
 .dvc/cache
+/data/chroma_db/
+/data/hf_cache/
