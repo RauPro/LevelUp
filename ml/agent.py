@@ -1,6 +1,9 @@
 import json
 import os
 import re
+import pickle
+import uuid
+import tempfile
 from dotenv import load_dotenv
 from e2b_code_interpreter import Sandbox
 from langchain.prompts import ChatPromptTemplate
@@ -9,12 +12,30 @@ from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 from app.api.schemas import DifficultyLevel, ProblemTopic
 import openai
+import mlflow
 from models.state import SessionState, Problem
 
 from ml.rag_retriever import default_retriever as rag_retriever
 
 dotenv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env")
 load_dotenv(dotenv_path=dotenv_path)
+
+# Configure MLflow
+mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000"))
+
+# Create or set the experiment
+EXPERIMENT_NAME = "problem-generation"
+try:
+    experiment = mlflow.get_experiment_by_name(EXPERIMENT_NAME)
+    if experiment is None:
+        experiment_id = mlflow.create_experiment(EXPERIMENT_NAME)
+    else:
+        experiment_id = experiment.experiment_id
+    mlflow.set_experiment(EXPERIMENT_NAME)
+except Exception as e:
+    print(f"Error setting up MLflow experiment: {e}")
+    # Fallback to default experiment
+    experiment_id = "0"
 
 
 def create_initial_state(user_prompt: str, topic: ProblemTopic, difficulty: DifficultyLevel) -> SessionState:
@@ -26,9 +47,10 @@ def create_initial_state(user_prompt: str, topic: ProblemTopic, difficulty: Diff
 llm = ChatOpenAI(model_name="gpt-4", openai_api_key=os.getenv("OPENAI_API_KEY"))
 
 sandbox = Sandbox(api_key=os.getenv("E2B_API_KEY"))
-
+global_prompt = ""
 
 def problem_agent(state: SessionState) -> SessionState:
+    global  global_prompt
     """Generate programming problems using RAG approach."""
     openai.api_key = os.getenv("OPENAI_API_KEY")
 
@@ -39,7 +61,7 @@ def problem_agent(state: SessionState) -> SessionState:
     # Generate a prompt using the retrieved problems
     prompt = rag_retriever.generate_prompt(topic=state["topic"].value, difficulty=state["difficulty"].value,
         retrieved_problems=retrieved_problems)
-
+    global_prompt = prompt
     messages = [{"role": "user", "content": prompt}]
 
     response = openai.chat.completions.create(model="gpt-4o", messages=messages,
@@ -139,36 +161,71 @@ def code_agent(state: SessionState) -> SessionState:
 def run_tests(state: SessionState) -> SessionState:
     """Run tests using E2B sandbox if available, otherwise use local execution."""
 
-    if state["code"] is None:
-        state["tests_passed"] = False
-        return state
-
-    if state["problem"] is None:
+    if state["code"] is None or state["problem"] is None:
         state["tests_passed"] = False
         return state
 
     code = state["code"]
     test = state["problem"].tests[0]
 
+    # Clean up code formatting if needed
     if "```python" in code:
         code_match = re.search(r"```python\n(.*?)\n```", code, re.DOTALL)
         if code_match:
             code = code_match.group(1)
     elif "```" in code:
         code = re.sub(r"```.*?\n(.*?)\n```", r"\1", code, flags=re.DOTALL)
-    print(f"Running code:\n{code}\nWith test input: '{test['input']}' and expected output: '{test['output']}'")
+
+    # Process test input - convert list-like strings to space-separated values
+    test_input = test["input"]
+    if test_input.strip().startswith('[') and test_input.strip().endswith(']'):
+        try:
+            # Convert string representation of list to actual list
+            input_list = json.loads(test_input.replace("'", '"'))
+            # Convert list to space-separated string
+            test_input = ' '.join(map(str, input_list))
+        except json.JSONDecodeError:
+            # If conversion fails, use as-is
+            pass
+
+    print(f"Running code:\n{code}\nWith test input: '{test_input}' and expected output: '{test['output']}'")
+
     try:
         try:
-            test_input = test["input"]
             print(test_input)
             sandbox.files.write("tests.txt", test_input)
-            execution = sandbox.run_code(code, test["input"])
+            execution = sandbox.run_code(code, test_input)
             print(f"E2B execution logs: {execution.logs}")
 
             if execution.logs.stdout:
                 output = execution.logs.stdout[0].strip()
                 expected = test["output"].strip()
-                state["tests_passed"] = output == expected
+
+                # Normalize formats for comparison
+                if expected.startswith('[') and expected.endswith(']'):
+                    try:
+                        # Parse expected output as a list
+                        expected_list = json.loads(expected.replace("'", '"'))
+
+                        # Parse actual output as a list (if space-separated)
+                        if '[' not in output:
+                            output_list = list(map(int, output.split()))
+
+                            # Compare the lists regardless of format
+                            state["tests_passed"] = sorted(expected_list) == sorted(output_list)
+                        else:
+                            # Try to parse output as a list if it looks like one
+                            try:
+                                output_list = json.loads(output.replace("'", '"'))
+                                state["tests_passed"] = sorted(expected_list) == sorted(output_list)
+                            except:
+                                state["tests_passed"] = output == expected
+                    except:
+                        # Fall back to direct comparison if parsing fails
+                        state["tests_passed"] = output == expected
+                else:
+                    state["tests_passed"] = output == expected
+
                 print(f"Expected: '{expected}', Got: '{output}', Passed: {state['tests_passed']}")
             else:
                 state["tests_passed"] = False
@@ -182,13 +239,13 @@ def run_tests(state: SessionState) -> SessionState:
             import sys
             import tempfile
 
-            print(f"Running test locally with input: '{test['input']}'")
+            print(f"Running test locally with input: '{test_input}'")
 
             with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
                 f.write(code)
                 temp_file = f.name
 
-            process = subprocess.run([sys.executable, temp_file], input=test["input"], capture_output=True, text=True,
+            process = subprocess.run([sys.executable, temp_file], input=test_input, capture_output=True, text=True,
                                      timeout=5)
 
             os.unlink(temp_file)
@@ -196,7 +253,26 @@ def run_tests(state: SessionState) -> SessionState:
             if process.returncode == 0:
                 output = process.stdout.strip()
                 expected = test["output"].strip()
-                state["tests_passed"] = output == expected
+
+                # Normalize formats for comparison (same logic as above)
+                if expected.startswith('[') and expected.endswith(']'):
+                    try:
+                        expected_list = json.loads(expected.replace("'", '"'))
+
+                        if '[' not in output:
+                            output_list = list(map(int, output.split()))
+                            state["tests_passed"] = sorted(expected_list) == sorted(output_list)
+                        else:
+                            try:
+                                output_list = json.loads(output.replace("'", '"'))
+                                state["tests_passed"] = sorted(expected_list) == sorted(output_list)
+                            except:
+                                state["tests_passed"] = output == expected
+                    except:
+                        state["tests_passed"] = output == expected
+                else:
+                    state["tests_passed"] = output == expected
+
                 print(f"Expected: '{expected}', Got: '{output}', Passed: {state['tests_passed']}")
             else:
                 state["tests_passed"] = False
@@ -207,7 +283,6 @@ def run_tests(state: SessionState) -> SessionState:
         state["tests_passed"] = False
 
     return state
-
 
 def should_continue_coding(state: SessionState) -> bool:
     return not state["tests_passed"] and state["code_attempts"] < 5
@@ -251,3 +326,6 @@ def save_graph_visualization() -> None:
         f.write(png_data)
 
     print(f"✅ PNG diagram saved to: {png_path}")
+
+
+
