@@ -12,10 +12,11 @@ from app.api.schemas import (
     ProblemResponse,
     ProblemTopic,
 )
+from data.sql_db.insert_grafana_data import save_evaluation_results
+from ml.agent import app as agent_app
+from ml.agent import create_initial_state
 from ml.eval_mlflow import log_to_mlflow
 from pipelines.rag_pipeline import generate_new_problem
-from ml.agent import create_initial_state, app as agent_app, Problem
-
 
 router = APIRouter()
 
@@ -117,7 +118,16 @@ async def generate_verified_problem(request: ProblemRequest) -> dict:
         )
 
         final_state = agent_app.invoke(initial_state)
-        mlflow_run_id = log_to_mlflow(final_state)
+        info_for_grafana = log_to_mlflow(final_state)
+        # Save to database
+
+        run_id, metrics, problem_attempts, code_attempts = info_for_grafana
+        save_evaluation_results(
+            run_id=run_id,
+            metrics_dict=metrics,
+            problem_attempts=problem_attempts,
+            code_attempts=code_attempts,
+        )
 
         # Check if tests passed
         if not final_state["tests_passed"]:

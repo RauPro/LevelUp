@@ -21,6 +21,7 @@ def log_to_mlflow(state: SessionState) -> str:
         str: The MLflow run ID that can be used for Grafana visualization
     """
     import pandas as pd
+
     from ml.metrics import difficulty_accuracy_metric, topic_relevance_metric
 
     # Start MLflow run with a descriptive name
@@ -38,14 +39,11 @@ def log_to_mlflow(state: SessionState) -> str:
         # Create a small evaluation dataset with this problem
         if state["problem"]:
             # Construct query and prediction for evaluation
-            query = global_prompt if global_prompt != '' else "Give me easy sorting problem"
+            query = global_prompt if global_prompt != "" else "Give me easy sorting problem"
             problem_description = state["problem"].description
 
             try:
-                eval_data = pd.DataFrame({
-                    "inputs": [query],
-                    "predictions": [problem_description]
-                })
+                eval_data = pd.DataFrame({"inputs": [query], "predictions": [problem_description]})
                 levelup_qa_model = mlflow.openai.log_model(
                     model="gpt-4o-mini",
                     task=openai.chat.completions,
@@ -61,10 +59,7 @@ def log_to_mlflow(state: SessionState) -> str:
                 mlflow.log_param("generator_model", "gpt-4o-mini")
                 mlflow.log_param("judge_model", "openai:/gpt-4")
 
-                eval_dataset = mlflow.data.from_pandas(
-                    df=eval_data,
-                    name="levelup_evaluation_data"
-                )
+                eval_dataset = mlflow.data.from_pandas(df=eval_data, name="levelup_evaluation_data")
                 mlflow.log_input(eval_dataset)
 
                 results = mlflow.evaluate(
@@ -74,17 +69,14 @@ def log_to_mlflow(state: SessionState) -> str:
                         topic_relevance_metric,
                         difficulty_accuracy_metric,
                     ],
-                    evaluator_config={
-                        "col_mapping": {
-                            "inputs": "inputs",
-                            "predictions": "predictions"
-                        }
-                    }
+                    evaluator_config={"col_mapping": {"inputs": "inputs", "predictions": "predictions"}},
                 )
 
                 print("Evaluation Results:")
+                metrices_for_grafana = {}
                 for metric_name, value in results.metrics.items():
                     print(f"{metric_name}: {value}")
+                    metrices_for_grafana[metric_name] = value
 
                 if "eval_results_table" in results.tables:
                     detailed_results = results.tables["eval_results_table"]
@@ -125,4 +117,5 @@ def log_to_mlflow(state: SessionState) -> str:
         os.unlink(state_path)
         mlflow.log_metric("problem_attempts", state["problem_attempts"])
         mlflow.log_metric("code_attempts", state["code_attempts"])
-        return run.info.run_id
+
+        return run.info.run_id, metrices_for_grafana, state["problem_attempts"], state["code_attempts"]
