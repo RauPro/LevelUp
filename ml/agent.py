@@ -47,9 +47,10 @@ def create_initial_state(user_prompt: str, topic: ProblemTopic, difficulty: Diff
 llm = ChatOpenAI(model_name="gpt-4", openai_api_key=os.getenv("OPENAI_API_KEY"))
 
 sandbox = Sandbox(api_key=os.getenv("E2B_API_KEY"))
-
+global_prompt = ""
 
 def problem_agent(state: SessionState) -> SessionState:
+    global  global_prompt
     """Generate programming problems using RAG approach."""
     openai.api_key = os.getenv("OPENAI_API_KEY")
 
@@ -60,7 +61,7 @@ def problem_agent(state: SessionState) -> SessionState:
     # Generate a prompt using the retrieved problems
     prompt = rag_retriever.generate_prompt(topic=state["topic"].value, difficulty=state["difficulty"].value,
         retrieved_problems=retrieved_problems)
-
+    global_prompt = prompt
     messages = [{"role": "user", "content": prompt}]
 
     response = openai.chat.completions.create(model="gpt-4o", messages=messages,
@@ -355,8 +356,7 @@ def log_to_mlflow(state: SessionState) -> str:
         # Create a small evaluation dataset with this problem
         if state["problem"]:
             # Construct query and prediction for evaluation
-            query = rag_retriever.generate_prompt(topic=state["topic"].value, difficulty=state["difficulty"].value,
-    retrieved_problems=retrieved_problems)
+            query = global_prompt if global_prompt != '' else "Give me easy sorting problem"
             problem_description = state["problem"].description
 
             try:
@@ -441,6 +441,6 @@ def log_to_mlflow(state: SessionState) -> str:
             state_path = f.name
         mlflow.log_artifact(state_path, "full_state")
         os.unlink(state_path)
-
-        # Return the run ID (object_id) for Grafana
+        mlflow.log_metric("problem_attempts", state["problem_attempts"])
+        mlflow.log_metric("code_attempts", state["code_attempts"])
         return run.info.run_id
