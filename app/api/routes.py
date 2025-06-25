@@ -13,7 +13,7 @@ from app.api.schemas import (
     ProblemTopic,
 )
 from pipelines.rag_pipeline import generate_new_problem
-from ml.agent import create_initial_state, app as agent_app, Problem
+from ml.agent import create_initial_state, app as agent_app, Problem, log_to_mlflow
 
 router = APIRouter()
 
@@ -95,12 +95,13 @@ async def generate_verified_problem(request: ProblemRequest) -> dict:
     2. Writes a solution for the problem
     3. Tests the solution against the test cases
     4. Only returns problems where the tests pass
+    5. Logs metrics and state to MLflow for monitoring
 
     Args:
         request: ProblemRequest containing topic, difficulty, and user_prompt
 
     Returns:
-        dict: A response containing the verified problem
+        dict: A response containing the verified problem and MLflow tracking information
 
     Raises:
         HTTPException: If problem generation fails or no valid problem could be generated
@@ -113,8 +114,8 @@ async def generate_verified_problem(request: ProblemRequest) -> dict:
             difficulty=request.difficulty,
         )
 
-        # Run the LangGraph workflow
         final_state = agent_app.invoke(initial_state)
+        mlflow_run_id = log_to_mlflow(final_state)
 
         # Check if tests passed
         if not final_state["tests_passed"]:
@@ -145,6 +146,7 @@ async def generate_verified_problem(request: ProblemRequest) -> dict:
                 "difficulty": request.difficulty,
                 "topic": request.topic,
                 "solution": final_state["code"] if final_state["code"] else "No solution available",
+                "mlflow_run_id": mlflow_run_id,  # Add MLflow run ID for Grafana
             }
 
             return {"response": problem_response}
