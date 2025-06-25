@@ -12,8 +12,10 @@ from app.api.schemas import (
     ProblemResponse,
     ProblemTopic,
 )
+from ml.eval_mlflow import log_to_mlflow
 from pipelines.rag_pipeline import generate_new_problem
-from ml.agent import create_initial_state, app as agent_app, Problem, log_to_mlflow
+from ml.agent import create_initial_state, app as agent_app, Problem
+
 
 router = APIRouter()
 
