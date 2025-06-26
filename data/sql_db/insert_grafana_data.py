@@ -78,3 +78,4 @@ def save_evaluation_results(run_id, metrics_dict, problem_attempts, code_attempt
         if 'conn' in locals():
             cur.close()
             conn.close()
+

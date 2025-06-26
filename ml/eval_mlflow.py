@@ -165,3 +165,4 @@ def log_to_mlflow(state: SessionState, state_history: Iterator = None) -> tuple:
         mlflow.log_metric("code_attempts", state["code_attempts"])
 
         return run.info.run_id, metrices_for_grafana, state["problem_attempts"], state["code_attempts"]
+
