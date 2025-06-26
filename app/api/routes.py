@@ -120,7 +120,6 @@ async def generate_verified_problem(request: ProblemRequest) -> dict:
         final_state = agent_app.invoke(initial_state)
         info_for_grafana = log_to_mlflow(final_state)
         # Save to database
-
         run_id, metrics, problem_attempts, code_attempts = info_for_grafana
         save_evaluation_results(
             run_id=run_id,
@@ -158,7 +157,7 @@ async def generate_verified_problem(request: ProblemRequest) -> dict:
                 "difficulty": request.difficulty,
                 "topic": request.topic,
                 "solution": final_state["code"] if final_state["code"] else "No solution available",
-                "mlflow_run_id": mlflow_run_id,  # Add MLflow run ID for Grafana
+                "mlflow_run_id": run_id,  # Add MLflow run ID for Grafana
             }
 
             return {"response": problem_response}

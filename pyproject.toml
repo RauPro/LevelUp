@@ -10,7 +10,7 @@ readme = "README.md"
 authors = [
     {name = "LevelUp Team"}
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
@@ -25,7 +25,6 @@ dependencies = [
     "httpx>=0.25.1",
     "datasets>=3.1.0",
     "psycopg2-binary>=2.9.10",
-    "numpy>=1.24.4",
     "click",
     "h11",
     "starlette",
@@ -33,8 +32,6 @@ dependencies = [
     "typing_extensions",
     "typing_inspection",
     "chromadb>=0.4.15",
-    "pandas>=2.0.0",
-    "tqdm>=4.64.0",
     "mistralai>=0.0.12",
     "sentence-transformers>=2.2.2",
     "ruff>=0.1.3",
@@ -42,6 +39,19 @@ dependencies = [
     "black>=23.10.1",
     "pytest-cov>=4.1.0",
     "pre-commit>=3.5.0",
+    "numpy>=2.3.0",
+    "mlflow==3.1.0",
+    "pandas>=2.2.3",
+    "scikit-learn>=1.7.0",
+    "joblib>=1.5.0",
+    "ipykernel>=6.29.5",
+    "tqdm>=4.67.1",
+    "jupyterlab>=4.4.3",
+    "langchain-openai>=0.3.23",
+    "langgraph>=0.0.30",
+    "langchain>=0.3.25",
+    "langgraph>=0.4.8",
+    "e2b-code-interpreter",
 ]
 
 [project.optional-dependencies]
@@ -53,7 +63,7 @@ packages = ["app", "ml", "data", "pipelines", "tests"]
 
 [tool.ruff]
 line-length = 500
-target-version = "py39"
+target-version = "py311"
 exclude = ["data"]
 
 [tool.ruff.lint]
@@ -64,7 +74,7 @@ ignore = []
 known-first-party = ["app", "ml", "data", "pipelines"]
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
