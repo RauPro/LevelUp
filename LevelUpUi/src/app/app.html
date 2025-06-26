@@ -1,0 +1,764 @@
+<!-- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * -->
+<!-- * * * * * * * * * * * The content below * * * * * * * * * * * -->
+<!-- * * * * * * * * * * is only a placeholder * * * * * * * * * * -->
+<!-- * * * * * * * * * * and can be replaced.  * * * * * * * * * * -->
+<!-- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * -->
+<!-- * * * * * * * * * Delete the template below * * * * * * * * * -->
+<!-- * * * * * * * to get started with your project! * * * * * * * -->
+<!-- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * -->
+
+<style>
+  :host {
+    /* Base colors */
+    --bright-blue: oklch(51.01% 0.274 263.83);
+    --electric-violet: oklch(53.18% 0.28 296.97);
+    --french-violet: oklch(47.66% 0.246 305.88);
+    --vivid-pink: oklch(69.02% 0.277 332.77);
+    --hot-red: oklch(61.42% 0.238 15.34);
+    --orange-red: oklch(63.32% 0.24 31.68);
+
+    /* Light theme grays */
+    --gray-900: oklch(19.37% 0.006 300.98);
+    --gray-800: oklch(26.5% 0.01 301.5);
+    --gray-700: oklch(36.98% 0.014 302.71);
+    --gray-500: oklch(55.5% 0.015 303.3);
+    --gray-400: oklch(70.9% 0.015 304.04);
+    --gray-300: oklch(83.5% 0.01 304.5);
+    --gray-200: oklch(92.5% 0.005 305);
+    --gray-100: oklch(97% 0.003 305.5);
+
+    /* Dark theme colors */
+    --dark-bg: oklch(17% 0.005 300);
+    --dark-surface: oklch(22% 0.008 300.5);
+    --dark-surface-2: oklch(25% 0.01 301);
+    --dark-text: oklch(95% 0.005 300);
+    --dark-text-secondary: oklch(80% 0.008 300);
+    --dark-border: oklch(30% 0.01 300);
+
+    /* Accent colors */
+    --accent-primary: var(--electric-violet);
+    --accent-secondary: var(--vivid-pink);
+    --accent-success: oklch(70% 0.15 140); /* A soft green */
+    --accent-warning: oklch(75% 0.15 80); /* A soft amber */
+    --accent-error: var(--hot-red);
+
+    /* Gradients */
+    --red-to-pink-to-purple-vertical-gradient: linear-gradient(
+      180deg,
+      var(--orange-red) 0%,
+      var(--vivid-pink) 50%,
+      var(--electric-violet) 100%
+    );
+
+    --red-to-pink-to-purple-horizontal-gradient: linear-gradient(
+      90deg,
+      var(--orange-red) 0%,
+      var(--vivid-pink) 50%,
+      var(--electric-violet) 100%
+    );
+
+    --premium-gradient: linear-gradient(
+      135deg,
+      var(--electric-violet) 0%,
+      var(--vivid-pink) 50%,
+      var(--accent-primary) 100%
+    );
+
+    /* Theme variables */
+    --background: var(--dark-bg);
+    --surface: var(--dark-surface);
+    --surface-2: var(--dark-surface-2);
+    --text-primary: var(--dark-text);
+    --text-secondary: var(--dark-text-secondary);
+    --border-color: var(--dark-border);
+    --primary: var(--accent-primary);
+    --secondary: var(--accent-secondary);
+    --success: var(--accent-success);
+    --pill-accent: var(--bright-blue);
+
+    /* Shadows */
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.4);
+
+    /* Transitions */
+    --transition-fast: 0.15s ease;
+    --transition-normal: 0.3s ease;
+
+    /* Typography */
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+      Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+      "Segoe UI Symbol";
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+
+    /* Base styles for the entire app */
+    background-color: var(--background);
+    color: var(--text-primary);
+  }
+
+  h1 {
+    font-size: 3.125rem;
+    color: var(--text-primary);
+    font-weight: 500;
+    line-height: 100%;
+    letter-spacing: -0.125rem;
+    margin: 0;
+    font-family: "Inter Tight", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+      Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+      "Segoe UI Symbol";
+  }
+
+  p {
+    margin: 0;
+    color: var(--text-secondary);
+  }
+
+  main {
+    width: 100%;
+    min-height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 1rem;
+    box-sizing: inherit;
+    position: relative;
+  }
+
+  .angular-logo {
+    max-width: 9.2rem;
+  }
+
+  .content {
+    display: flex;
+    justify-content: space-around;
+    width: 100%;
+    max-width: 700px;
+    margin-bottom: 3rem;
+  }
+
+  .content h1 {
+    margin-top: 1.75rem;
+  }
+
+  .content p {
+    margin-top: 1.5rem;
+  }
+
+  .divider {
+    width: 1px;
+    background: var(--red-to-pink-to-purple-vertical-gradient);
+    margin-inline: 0.5rem;
+  }
+
+  .pill-group {
+    display: flex;
+    flex-direction: column;
+    align-items: start;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+  }
+
+  .pill {
+    display: flex;
+    align-items: center;
+    --pill-accent: var(--bright-blue);
+    background: color-mix(in srgb, var(--pill-accent) 5%, transparent);
+    color: var(--pill-accent);
+    padding-inline: 0.75rem;
+    padding-block: 0.375rem;
+    border-radius: 2.75rem;
+    border: 0;
+    transition: background 0.3s ease;
+    font-family: var(--inter-font);
+    font-size: 0.875rem;
+    font-style: normal;
+    font-weight: 500;
+    line-height: 1.4rem;
+    letter-spacing: -0.00875rem;
+    text-decoration: none;
+  }
+
+  .pill:hover {
+    background: color-mix(in srgb, var(--pill-accent) 15%, transparent);
+  }
+
+  .pill-group .pill:nth-child(6n + 1) {
+    --pill-accent: var(--bright-blue);
+  }
+  .pill-group .pill:nth-child(6n + 2) {
+    --pill-accent: var(--french-violet);
+  }
+  .pill-group .pill:nth-child(6n + 3),
+  .pill-group .pill:nth-child(6n + 4),
+  .pill-group .pill:nth-child(6n + 5) {
+    --pill-accent: var(--hot-red);
+  }
+
+  .pill-group svg {
+    margin-inline-start: 0.25rem;
+  }
+
+  .social-links {
+    display: flex;
+    align-items: center;
+    gap: 0.73rem;
+    margin-top: 1.5rem;
+  }
+
+  .social-links path {
+    transition: fill 0.3s ease;
+    fill: var(--gray-400);
+  }
+
+  .social-links a:hover svg path {
+    fill: var(--gray-900);
+  }
+
+  .app-container {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    width: 100%;
+    padding: 2rem;
+    box-sizing: border-box;
+    background-color: var(--background);
+    min-height: 100vh;
+  }
+
+  .grid-container {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 2rem;
+    width: 100%;
+    max-width: 1200px;
+  }
+
+  .control-panel {
+    background: var(--surface);
+    padding: 2rem;
+    border-radius: 0.75rem;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--border-color);
+    backdrop-filter: blur(10px);
+    transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+  }
+
+  .control-panel:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-2px);
+  }
+
+  .control-panel h2 {
+    font-size: 1.75rem;
+    font-weight: 600;
+    margin-bottom: 1.75rem;
+    color: var(--text-primary);
+    position: relative;
+    letter-spacing: -0.03em;
+  }
+
+  .control-panel h2::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: -0.5rem;
+    width: 3rem;
+    height: 3px;
+    background: var(--premium-gradient);
+    border-radius: 1.5px;
+  }
+
+  .form-group {
+    margin-bottom: 1.5rem;
+  }
+
+  .form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .form-group select,
+  .form-group textarea {
+    width: 100%;
+    padding: 0.875rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    color: var(--text-primary);
+    background: var(--surface-2);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .form-group select:focus,
+  .form-group textarea:focus {
+    border-color: var(--primary);
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 25%, transparent);
+  }
+
+  .form-group select {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%238e8ea0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 1rem;
+    padding-right: 2.5rem;
+  }
+
+  .generate-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.875rem 1.75rem;
+    border: none;
+    border-radius: 0.5rem;
+    background: var(--premium-gradient);
+    color: white;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    box-shadow: var(--shadow-md);
+    letter-spacing: 0.01em;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .generate-btn::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0));
+    opacity: 0;
+    transition: opacity var(--transition-normal);
+  }
+
+  .generate-btn:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-2px);
+  }
+
+  .generate-btn:hover::before {
+    opacity: 1;
+  }
+
+  .generate-btn:active {
+    transform: translateY(1px);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .generate-btn:disabled {
+    background: var(--dark-border);
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+  }
+
+  .spinner {
+    margin-left: 0.75rem;
+    border: 2px solid rgba(255, 255, 255, 0.5);
+    border-top: 2px solid white;
+    border-radius: 50%;
+    width: 1.125rem;
+    height: 1.125rem;
+    animation: spin 0.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+
+  @keyframes spin {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+
+  .display-area {
+    background: var(--surface);
+    padding: 2rem;
+    border-radius: 0.75rem;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--border-color);
+    flex: 1;
+    position: relative;
+    transition: box-shadow var(--transition-normal);
+  }
+
+  .display-area:hover {
+    box-shadow: var(--shadow-lg);
+  }
+
+  .initial-state {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 1.125rem;
+    padding: 3rem 1rem;
+    background: var(--surface-2);
+    border-radius: 0.5rem;
+    border: 1px dashed var(--border-color);
+  }
+
+  .loading-state {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 300px;
+  }
+
+  .loader {
+    border: 4px solid var(--dark-border);
+    border-top: 4px solid var(--primary);
+    border-radius: 50%;
+    width: 2.5rem;
+    height: 2.5rem;
+    animation: spin 0.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+
+  .error-state {
+    text-align: center;
+    color: var(--accent-error);
+    font-size: 1.125rem;
+    padding: 2rem;
+    background: color-mix(in srgb, var(--accent-error) 10%, var(--surface-2));
+    border-radius: 0.5rem;
+    border: 1px solid color-mix(in srgb, var(--accent-error) 30%, transparent);
+  }
+
+  .error-details {
+    margin-top: 1rem;
+    font-size: 0.875rem;
+    opacity: 0.8;
+  }
+
+  .challenge-container {
+    margin-top: 0;
+  }
+
+  .challenge-container h3 {
+    font-size: 1.5rem;
+    margin-bottom: 1.25rem;
+    color: var(--text-primary);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    position: relative;
+    display: inline-block;
+  }
+
+  .challenge-container h3::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: -0.5rem;
+    width: 50%;
+    height: 2px;
+    background: var(--premium-gradient);
+    border-radius: 1px;
+  }
+
+  .challenge-container p {
+    margin-bottom: 1.75rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+
+  .constraints-section,
+  .example-section,
+  .solution-section {
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background: var(--surface-2);
+    border-radius: 0.5rem;
+    border: 1px solid var(--border-color);
+    transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+  }
+
+  .constraints-section:hover,
+  .example-section:hover,
+  .solution-section:hover {
+    box-shadow: var(--shadow-sm);
+    transform: translateY(-2px);
+  }
+
+  .constraints-section h4,
+  .example-section h4,
+  .solution-section h4 {
+    font-size: 1.125rem;
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+  }
+
+  .constraints-section h4::before,
+  .example-section h4::before,
+  .solution-section h4::before {
+    content: "";
+    display: inline-block;
+    width: 0.5rem;
+    height: 0.5rem;
+    margin-right: 0.5rem;
+    border-radius: 50%;
+    background: var(--primary);
+  }
+
+  .example-section h4::before {
+    background: var(--secondary);
+  }
+
+  .solution-section h4::before {
+    background: var(--success);
+  }
+
+  .example-item {
+    margin-bottom: 0.75rem;
+    padding: 0.75rem;
+    background: color-mix(in srgb, var(--primary) 5%, var(--surface));
+    border-radius: 0.375rem;
+  }
+
+  .example-item strong {
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+
+  .example-item code {
+    color: var(--primary);
+    background: color-mix(in srgb, var(--primary) 10%, transparent);
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.9em;
+  }
+
+  .example-item em {
+    color: var(--text-secondary);
+    font-style: italic;
+  }
+
+  .code-block {
+    position: relative;
+    padding: 1.5rem;
+    background: color-mix(in srgb, var(--dark-bg) 80%, black);
+    border-radius: 0.5rem;
+    overflow: hidden;
+    margin-top: 1rem;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-md);
+  }
+
+  .code-block::before {
+    content: "Python";
+    position: absolute;
+    top: 0;
+    left: 0;
+    padding: 0.25rem 0.75rem;
+    background: var(--primary);
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-bottom-right-radius: 0.375rem;
+  }
+
+  .code-block pre {
+    margin: 0;
+    padding: 0;
+    overflow-x: auto;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: var(--text-primary);
+  }
+
+  .copy-btn {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: transparent;
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    padding: 0.25rem 0.625rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    z-index: 10;
+  }
+
+  .copy-btn:hover {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+  }
+
+  .copy-btn:active {
+    transform: scale(0.95);
+  }
+
+  .copy-btn::before {
+    content: "";
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='9' y='9' width='13' height='13' rx='2' ry='2'%3E%3C/rect%3E%3Cpath d='M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'%3E%3C/path%3E%3C/svg%3E");
+    background-size: contain;
+    background-repeat: no-repeat;
+  }
+
+  /* Animation for copied state */
+  .copy-btn.copied {
+    background: var(--success);
+    color: white;
+    border-color: var(--success);
+  }
+
+  .copy-btn.copied::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
+  }
+
+  @media screen and (max-width: 650px) {
+    .content {
+      flex-direction: column;
+      width: max-content;
+    }
+
+    .divider {
+      height: 1px;
+      width: 100%;
+      background: var(--red-to-pink-to-purple-horizontal-gradient);
+      margin-block: 1.5rem;
+    }
+
+    .grid-container {
+      grid-template-columns: 1fr;
+    }
+
+    .control-panel {
+      order: 1;
+    }
+
+    .display-area {
+      order: 2;
+    }
+  }
+</style>
+
+<div class="app-container">
+  <div class="grid-container">
+    <!-- Left Column: Controls Panel -->
+    <div class="control-panel">
+      <h2>Generate a Challenge</h2>
+      <form (submit)="generateChallenge($event)">
+        <div class="form-group">
+          <label for="topic">Topic</label>
+          <select id="topic" [(ngModel)]="topic" name="topic" required>
+            <option value="arrays">Arrays</option>
+            <option value="strings">Strings</option>
+            <option value="linked_lists">Linked Lists</option>
+            <option value="trees">Trees</option>
+            <option value="graphs">Graphs</option>
+            <option value="dynamic_programming">Dynamic Programming</option>
+            <option value="sorting">Sorting</option>
+            <option value="searching">Searching</option>
+            <option value="recursion">Recursion</option>
+            <option value="backtracking">Backtracking</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="difficulty">Difficulty</label>
+          <select id="difficulty" [(ngModel)]="difficulty" name="difficulty" required>
+            <option value="easy">Easy</option>
+            <option value="medium">Medium</option>
+            <option value="hard">Hard</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="optionalPrompt">Add details (optional)</label>
+          <textarea id="optionalPrompt" [(ngModel)]="optionalPrompt" name="optionalPrompt" rows="4"></textarea>
+        </div>
+
+        <button type="submit" [disabled]="isLoading" class="generate-btn">
+          Generate
+          <span *ngIf="isLoading" class="spinner"></span>
+        </button>
+      </form>
+    </div>
+
+    <!-- Right Column: Display Area -->
+    <div class="display-area">
+      <div *ngIf="!challenge && !isLoading && !error" class="initial-state">
+        Your generated challenge will appear here.
+      </div>
+
+      <div *ngIf="isLoading" class="loading-state">
+        <div class="loader"></div>
+      </div>
+
+      <div *ngIf="error" class="error-state">
+        <p>Sorry, something went wrong. Please try again.</p>
+        <p class="error-details">{{ error }}</p>
+      </div>
+
+      <div *ngIf="challenge && !isLoading" class="challenge-container">
+        <h3>{{ challenge.title }}</h3>
+        <p>{{ challenge.description }}</p>
+
+        <div class="constraints-section">
+          <h4>Constraints</h4>
+          <ul>
+            <li *ngFor="let constraint of challenge.constraints">{{ constraint }}</li>
+          </ul>
+        </div>
+
+        <div class="example-section" *ngFor="let example of challenge.examples; let i = index">
+          <h4>Example {{ challenge.examples.length > 1 ? (i + 1) : '' }}</h4>
+          <div class="example-item">
+            <strong>Input:</strong> <code>{{ example.input }}</code>
+          </div>
+          <div class="example-item">
+            <strong>Output:</strong> <code>{{ example.output }}</code>
+          </div>
+          <div class="example-item" *ngIf="example.explanation">
+            <p><em>{{ example.explanation }}</em></p>
+          </div>
+        </div>
+
+        <div class="solution-section" *ngIf="challenge.solution">
+          <h4>Example Solution (Python)</h4>
+          <div class="code-block">
+            <button (click)="copySolution()" class="copy-btn">Copy Code</button>
+            <pre><code [innerHTML]="highlightedCode" class="language-python"></code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * -->
+<!-- * * * * * * * * * * * The content above * * * * * * * * * * * * -->
+<!-- * * * * * * * * * * is only a placeholder * * * * * * * * * * * -->
+<!-- * * * * * * * * * * and can be replaced.  * * * * * * * * * * * -->
+<!-- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * -->
+<!-- * * * * * * * * * * End of Placeholder  * * * * * * * * * * * * -->
+<!-- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * -->
+
+
+<router-outlet />

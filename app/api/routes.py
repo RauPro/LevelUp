@@ -1,3 +1,4 @@
+import asyncio
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, HTTPException
@@ -98,7 +99,7 @@ async def generate_verified_problem(request: ProblemRequest) -> dict:
     2. Writes a solution for the problem
     3. Tests the solution against the test cases
     4. Only returns problems where the tests pass
-    5. Logs metrics and state to MLflow for monitoring
+    5. Logs metrics and state to MLflow for monitoring (asynchronously)
 
     Args:
         request: ProblemRequest containing topic, difficulty, and user_prompt
@@ -127,22 +128,11 @@ async def generate_verified_problem(request: ProblemRequest) -> dict:
         # Retrieve the full state history using the thread_id
         state_history = agent_app.get_state_history(config)
 
-        # Log results and artifacts to MLflow
-        info_for_grafana = log_to_mlflow(final_state, state_history)
-        # Save to database
-        run_id, metrics, problem_attempts, code_attempts = info_for_grafana
-        save_evaluation_results(
-            run_id=run_id,
-            metrics_dict=metrics,
-            problem_attempts=problem_attempts,
-            code_attempts=code_attempts,
-        )
-
-        # Check if tests passed
+        # Check if tests passed early
         if not final_state["tests_passed"]:
             raise ValueError("Could not generate a problem with passing test cases")
 
-        # Convert agent's Problem format to ProblemResponse format
+        # Prepare the response first
         if final_state["problem"]:
             problem = final_state["problem"]
 
@@ -157,9 +147,13 @@ async def generate_verified_problem(request: ProblemRequest) -> dict:
                     }
                 )
 
+            # Generate a unique problem ID and run ID for tracking
+            problem_id = str(uuid4())
+            run_id = f"pending_{uuid4()}"  # Temporary run ID until MLflow completes
+
             # Create a problem response
             problem_response = {
-                "id": str(uuid4()),  # Generate a unique ID
+                "id": problem_id,
                 "title": f"Problem: {request.topic.value.title()}",
                 "description": problem.description,
                 "constraints": ["Time limit: 1 second", "Memory limit: 256 MB"],
@@ -167,8 +161,11 @@ async def generate_verified_problem(request: ProblemRequest) -> dict:
                 "difficulty": request.difficulty,
                 "topic": request.topic,
                 "solution": final_state["code"] if final_state["code"] else "No solution available",
-                "mlflow_run_id": run_id,  # Add MLflow run ID for Grafana
+                "mlflow_run_id": run_id,  # Will be updated asynchronously
             }
+
+            # Start MLflow logging in the background (fire and forget)
+            asyncio.create_task(log_and_save_async(final_state, state_history))
 
             return {"response": problem_response}
         else:
@@ -176,6 +173,38 @@ async def generate_verified_problem(request: ProblemRequest) -> dict:
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate verified problem: {str(e)}") from e
+
+
+async def log_and_save_async(final_state, state_history):
+    """
+    Asynchronously log results to MLflow and save to database.
+    This runs in the background without blocking the API response.
+    """
+    try:
+        # Run the heavy MLflow logging in a thread pool to avoid blocking
+        loop = asyncio.get_event_loop()
+        info_for_grafana = await loop.run_in_executor(
+            None, log_to_mlflow, final_state, state_history
+        )
+
+        # Save to database - unpack the tuple properly
+        if len(info_for_grafana) == 4:
+            run_id, metrics, problem_attempts, code_attempts = info_for_grafana
+            await loop.run_in_executor(
+                None,
+                save_evaluation_results,
+                run_id,
+                metrics,
+                problem_attempts,
+                code_attempts,
+            )
+            print(f"✅ Successfully logged to MLflow and database. Run ID: {run_id}")
+        else:
+            print(f"⚠️ Unexpected return format from log_to_mlflow: {info_for_grafana}")
+
+    except Exception as e:
+        # Log the error but don't fail the API response
+        print(f"❌ Error in background logging: {str(e)}")
 
 
 @router.get("/problems/{problem_id}", response_model=ProblemResponse)

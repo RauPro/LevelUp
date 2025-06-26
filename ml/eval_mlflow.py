@@ -78,7 +78,6 @@ def log_to_mlflow(state: SessionState, state_history: Iterator = None) -> tuple:
                 history_path = f.name
             mlflow.log_artifact(history_path, "state_history")
             os.unlink(history_path)
-
             # Log additional metadata about the workflow
             mlflow.log_param("total_workflow_steps", len(serializable_history))
             print(f"✅ Logged state history with {len(serializable_history)} steps as artifact")
