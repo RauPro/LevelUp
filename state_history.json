@@ -1,0 +1,79 @@
+[
+  {
+    "user_prompt": "Generate a problem Sowftware Engineer intern can solve in 30 minutes",
+    "topic": "arrays",
+    "difficulty": "easy",
+    "problem": {
+      "description": "Given an array of integers, find the maximum sum of a subarray within the given array. A subarray is a contiguous part of the array.",
+      "tests": [
+        {
+          "input": "[1, -2, 3, 10, -4, 7, 2, -5]",
+          "output": "18"
+        },
+        {
+          "input": "[-2, 1, -3, 4, -1, -2, 1, -5, 4]",
+          "output": "3"
+        }
+      ]
+    },
+    "code": "numbers = list(map(int, input().split()))\nmax_sum = float('-inf')\ncurrent_sum = 0\nfor num in numbers:\n    current_sum = max(num, current_sum + num)\n    max_sum = max(max_sum, current_sum)\nprint(max_sum)",
+    "tests_passed": true,
+    "code_attempts": 1,
+    "problem_attempts": 1
+  },
+  {
+    "user_prompt": "Generate a problem Sowftware Engineer intern can solve in 30 minutes",
+    "topic": "arrays",
+    "difficulty": "easy",
+    "problem": {
+      "description": "Given an array of integers, find the maximum sum of a subarray within the given array. A subarray is a contiguous part of the array.",
+      "tests": [
+        {
+          "input": "[1, -2, 3, 10, -4, 7, 2, -5]",
+          "output": "18"
+        },
+        {
+          "input": "[-2, 1, -3, 4, -1, -2, 1, -5, 4]",
+          "output": "3"
+        }
+      ]
+    },
+    "code": "numbers = list(map(int, input().split()))\nmax_sum = float('-inf')\ncurrent_sum = 0\nfor num in numbers:\n    current_sum = max(num, current_sum + num)\n    max_sum = max(max_sum, current_sum)\nprint(max_sum)",
+    "tests_passed": false,
+    "code_attempts": 1,
+    "problem_attempts": 1
+  },
+  {
+    "user_prompt": "Generate a problem Sowftware Engineer intern can solve in 30 minutes",
+    "topic": "arrays",
+    "difficulty": "easy",
+    "problem": {
+      "description": "Given an array of integers, find the maximum sum of a subarray within the given array. A subarray is a contiguous part of the array.",
+      "tests": [
+        {
+          "input": "[1, -2, 3, 10, -4, 7, 2, -5]",
+          "output": "18"
+        },
+        {
+          "input": "[-2, 1, -3, 4, -1, -2, 1, -5, 4]",
+          "output": "3"
+        }
+      ]
+    },
+    "code": null,
+    "tests_passed": false,
+    "code_attempts": 0,
+    "problem_attempts": 1
+  },
+  {
+    "user_prompt": "Generate a problem Sowftware Engineer intern can solve in 30 minutes",
+    "topic": "arrays",
+    "difficulty": "easy",
+    "problem": null,
+    "code": null,
+    "tests_passed": false,
+    "code_attempts": 0,
+    "problem_attempts": 0
+  },
+  {}
+]

@@ -3,13 +3,16 @@ import os
 import re
 import sys
 
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+import openai
 from dotenv import load_dotenv
 from e2b_code_interpreter import Sandbox
 from langchain.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_openai import ChatOpenAI
+from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
-from openai import OpenAI
 
 from app.api.schemas import DifficultyLevel, ProblemTopic
 
@@ -46,8 +49,7 @@ def create_initial_state(user_prompt: str, topic: ProblemTopic, difficulty: Diff
     return SessionState(user_prompt=user_prompt, topic=topic, difficulty=difficulty, problem=None, code=None, tests_passed=False, code_attempts=0, problem_attempts=0)
 
 
-# Use the official OpenAI client for Nebius API
-nebius_client = OpenAI(base_url="https://api.studio.nebius.com/v1/", api_key=os.environ.get("NEBIUS_API_KEY"))
+nebius_client = openai.OpenAI(base_url="https://api.studio.nebius.com/v1/", api_key=os.environ.get("NEBIUS_API_KEY"))
 
 sandbox = Sandbox(api_key=os.getenv("E2B_API_KEY"))
 global_prompt = ""
@@ -66,7 +68,7 @@ def problem_agent(state: SessionState) -> SessionState:
     global_prompt = prompt
     messages = [{"role": "user", "content": prompt}]
 
-    response = nebius_client.chat.completions.create(model="aaditya/Llama3-OpenBioLLM-70B", messages=messages, response_format={"type": "json_object"})
+    response = nebius_client.chat.completions.create(model="Qwen/Qwen2.5-72B-Instruct-fast", messages=messages, response_format={"type": "json_object"})
 
     generated_content = response.choices[0].message.content
     print(f"Generated content: {generated_content}")
@@ -80,6 +82,17 @@ def problem_agent(state: SessionState) -> SessionState:
         try:
             # Try to parse the JSON response
             problem_dict = json.loads(generated_content)
+
+            # Convert list inputs/outputs to strings
+            if "tests" in problem_dict and isinstance(problem_dict["tests"], list):
+                for test_case in problem_dict["tests"]:
+                    if "input" in test_case and isinstance(test_case["input"], list):
+                        test_case["input"] = " ".join(map(str, test_case["input"]))
+                    if "output" in test_case and not isinstance(test_case["output"], str):
+                        if isinstance(test_case["output"], list):
+                            test_case["output"] = " ".join(map(str, test_case["output"]))
+                        else:
+                            test_case["output"] = str(test_case["output"])
 
             # Adapt the response to match our Problem structure
             if "description" in problem_dict and "tests" in problem_dict:
@@ -111,7 +124,7 @@ def problem_agent(state: SessionState) -> SessionState:
                     {"role": "user", "content": 'The response could not be parsed correctly. Please provide a valid JSON object with \'description\' and \'tests\' fields only. IMPORTANT: Both \'input\' and \'output\' in each test MUST be strings (not integers or arrays). For example, if the input is a list, format it as a space-separated string like \'1 2 3 4\'. Example format: {"description": "Problem description", "tests": [{"input": "1 2 3", "output": "6"}]}'},
                 ]
 
-                retry_response = nebius_client.chat.completions.create(model="aaditya/Llama3-OpenBioLLM-70B", messages=retry_messages, response_format={"type": "json_object"})
+                retry_response = nebius_client.chat.completions.create(model="Qwen/Qwen2.5-72B-Instruct-fast", messages=retry_messages, response_format={"type": "json_object"})
 
                 generated_content = retry_response.choices[0].message.content
             else:
@@ -135,7 +148,7 @@ def code_agent(state: SessionState) -> SessionState:
     if state["problem"] is None:
         raise ValueError("Problem must be set before generating code")
     # Initialize LangChain LLM for code generation (using Nebius)
-    llm = ChatOpenAI(model_name="aaditya/Llama3-OpenBioLLM-70B", openai_api_base="https://api.studio.nebius.com/v1/", openai_api_key=os.environ.get("NEBIUS_API_KEY"))
+    llm = ChatOpenAI(model_name="Qwen/Qwen2.5-72B-Instruct-fast", openai_api_base="https://api.studio.nebius.com/v1/", openai_api_key=os.environ.get("NEBIUS_API_KEY"))
     prompt = ChatPromptTemplate.from_template("""Write a Python solution for: {problem_description}.
 
 IMPORTANT INPUT INSTRUCTIONS:
@@ -153,20 +166,16 @@ print(result)
     chain = prompt | llm | StrOutputParser()
     code = chain.invoke({"problem_description": state["problem"].description})
 
-    if "```python" in code:
-        code_match = re.search(r"```python\n(.*?)\n```", code, re.DOTALL)
-        if code_match:
-            code = code_match.group(1)
-    elif "```" in code:
-        code = re.sub(r"```.*?\n(.*?)\n```", r"\1", code, flags=re.DOTALL)
-
-    lines = code.split("\n")
-    clean_lines = []
-    for line in lines:
-        if not line.strip().startswith("#") or "import" in line or "def" in line:
-            clean_lines.append(line)
-
-    code = "\n".join(clean_lines).strip()
+    # Enhanced code cleaning to handle markdown and conversational text
+    code_match = re.search(r"```(?:python)?\n(.*?)```", code, re.DOTALL)
+    if code_match:
+        code = code_match.group(1).strip()
+    else:
+        # Fallback for code that might not be in a block
+        lines = code.split("\n")
+        # Filter out lines that are not part of the code
+        code_lines = [line for line in lines if not line.strip().startswith(("Here is", "This is", "The following"))]
+        code = "\n".join(code_lines).strip()
 
     state["code"] = code
     state["code_attempts"] += 1
@@ -183,13 +192,10 @@ def run_tests(state: SessionState) -> SessionState:
     code = state["code"]
     test = state["problem"].tests[0]
 
-    # Clean up code formatting if needed
-    if "```python" in code:
-        code_match = re.search(r"```python\n(.*?)\n```", code, re.DOTALL)
-        if code_match:
-            code = code_match.group(1)
-    elif "```" in code:
-        code = re.sub(r"```.*?\n(.*?)\n```", r"\1", code, flags=re.DOTALL)
+    # Clean up code formatting if needed (moved from code_agent)
+    code_match = re.search(r"```(?:python)?\n(.*?)```", code, re.DOTALL)
+    if code_match:
+        code = code_match.group(1).strip()
 
     # Process test input - convert list-like strings to space-separated values
     test_input = test["input"]
@@ -208,8 +214,9 @@ def run_tests(state: SessionState) -> SessionState:
     try:
         try:
             print(test_input)
-            sandbox.files.write("tests.txt", test_input)
-            execution = sandbox.run_code(code, test_input)
+            # The sandbox.run_code method is deprecated and does not support stdin.
+            # Using sandbox.run_python instead.
+            execution = sandbox.run_python(code, stdin=test_input)
             print(f"E2B execution logs: {execution.logs}")
 
             if execution.logs.stdout:
@@ -233,9 +240,9 @@ def run_tests(state: SessionState) -> SessionState:
                             try:
                                 output_list = json.loads(output.replace("'", '"'))
                                 state["tests_passed"] = sorted(expected_list) == sorted(output_list)
-                            except:
+                            except (json.JSONDecodeError, ValueError):
                                 state["tests_passed"] = output == expected
-                    except:
+                    except (json.JSONDecodeError, ValueError):
                         # Fall back to direct comparison if parsing fails
                         state["tests_passed"] = output == expected
                 else:
@@ -280,9 +287,9 @@ def run_tests(state: SessionState) -> SessionState:
                             try:
                                 output_list = json.loads(output.replace("'", '"'))
                                 state["tests_passed"] = sorted(expected_list) == sorted(output_list)
-                            except:
+                            except (json.JSONDecodeError, ValueError):
                                 state["tests_passed"] = output == expected
-                    except:
+                    except (json.JSONDecodeError, ValueError):
                         state["tests_passed"] = output == expected
                 else:
                     state["tests_passed"] = output == expected
@@ -324,36 +331,62 @@ workflow.add_edge("code_agent", "run_tests")
 
 workflow.add_conditional_edges("run_tests", lambda state: "end" if should_end(state) else ("code_agent" if should_continue_coding(state) else "problem_agent"), {"end": END, "code_agent": "code_agent", "problem_agent": "problem_agent"})
 
-app = workflow.compile()
+# Compile the workflow with a checkpointer
+checkpointer = MemorySaver()
+app = workflow.compile(checkpointer=checkpointer)
 
-# import json
-# config = {}
-# # Assuming `graph` is your Pregel graph object (e.g., from LangGraph)
-# # Replace `graph` with your actual graph instance
-# state_history = app.get_state_history(config=config)  # Returns a generator
 
-# # Collect snapshots and save as JSON
-# snapshots = []
-# for snapshot in state_history:
-#     snapshots.append({
-#         "timestamp": snapshot['ts'],
-#         "state": snapshot['state'],
-#         "config": snapshot.get('config', 'N/A')
-#     })
+def run_and_save_state_history(user_prompt: str, topic: ProblemTopic, difficulty: DifficultyLevel) -> None:
+    """Run the workflow and save the state history to a JSON file."""
+    # Create initial state
+    initial_state = create_initial_state(user_prompt, topic, difficulty)
 
-# # Save to JSON file
-# with open('state_history.json', 'w') as f:
-#     json.dump(snapshots, f, indent=2)
+    # Define config with a unique thread_id
+    config = {"configurable": {"thread_id": "run_001"}}
 
-#     snapshots.append({
-#         "timestamp": snapshot['ts'],
-#         "state": snapshot['state'],
-#         "config": snapshot.get('config', 'N/A')
-#     })
+    # Run the workflow
+    app.invoke(initial_state, config)
 
-# # Save to JSON file
-# with open('state_history.json', 'w') as f:
-#     json.dump(snapshots, f, indent=2)
+    # Retrieve state history
+    state_history = app.get_state_history(config)
+
+    # Convert to list of dictionaries
+    history_data = [snapshot.values for snapshot in state_history]
+
+    # Save to JSON
+    with open("state_history.json", "w") as f:
+        # The state contains Pydantic models and enums, which need to be handled for JSON serialization.
+        # We can't directly use json.dump without a custom encoder.
+        # A simple way is to convert the list to a JSON string first.
+        # This is a workaround if `snapshot.values.dict()` is not available or if the state is not a Pydantic model.
+        # Since SessionState is a TypedDict, we manually process it.
+        serializable_history = []
+        for state_snapshot in history_data:
+            # Create a copy to avoid modifying the original state
+            state_copy = state_snapshot.copy()
+            if "topic" in state_copy and hasattr(state_copy["topic"], "value"):
+                state_copy["topic"] = state_copy["topic"].value
+            if "difficulty" in state_copy and hasattr(state_copy["difficulty"], "value"):
+                state_copy["difficulty"] = state_copy["difficulty"].value
+            if "problem" in state_copy and state_copy["problem"] is not None:
+                # Assuming 'problem' is a Pydantic model or has a .dict() method
+                if hasattr(state_copy["problem"], "model_dump"):
+                    state_copy["problem"] = state_copy["problem"].model_dump()
+                elif hasattr(state_copy["problem"], "__dict__"):
+                    state_copy["problem"] = state_copy["problem"].__dict__
+            serializable_history.append(state_copy)
+
+        json.dump(serializable_history, f, indent=2)
+
+    print("State history saved to state_history.json")
+
+
+# Example usage (commented out to prevent execution during imports):
+# run_and_save_state_history(
+#     user_prompt="Generate a problem Software Engineer intern can solve in 30 minutes",
+#     topic=ProblemTopic.ARRAYS,
+#     difficulty=DifficultyLevel.EASY
+# )
 
 
 def save_graph_visualization() -> None:

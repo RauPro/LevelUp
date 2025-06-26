@@ -2,23 +2,25 @@ import json
 import os
 import pickle
 import tempfile
+from collections.abc import Iterator
 
 import mlflow
 import openai
 
 from ml.agent import global_prompt
-from models.state import SessionState
+from models.state import Problem, SessionState
 
 
-def log_to_mlflow(state: SessionState) -> str:
+def log_to_mlflow(state: SessionState, state_history: Iterator = None) -> tuple:
     """
     Log metrics and full session state to MLflow using the built-in evaluation framework.
 
     Args:
-        state: The SessionState containing all workflow information
+        state: The final SessionState of the workflow
+        state_history: Iterator of all state snapshots from the workflow run
 
     Returns:
-        str: The MLflow run ID that can be used for Grafana visualization
+        tuple: The run ID, metrics, problem attempts, and code attempts
     """
     import pandas as pd
 
@@ -35,6 +37,34 @@ def log_to_mlflow(state: SessionState) -> str:
 
         # Log user prompt as parameter
         mlflow.log_param("user_prompt", state["user_prompt"])
+
+        # Log the full state history as a JSON artifact
+        if state_history:
+            serializable_history = []
+            for snapshot in state_history:
+                # Convert the state snapshot to a serializable format
+                state_dict = dict(snapshot.values)
+
+                # Handle Pydantic models and enums
+                if state_dict.get("problem") and isinstance(state_dict["problem"], Problem):
+                    state_dict["problem"] = state_dict["problem"].model_dump()
+                if state_dict.get("topic") and hasattr(state_dict["topic"], "value"):
+                    state_dict["topic"] = state_dict["topic"].value
+                if state_dict.get("difficulty") and hasattr(state_dict["difficulty"], "value"):
+                    state_dict["difficulty"] = state_dict["difficulty"].value
+
+                serializable_history.append(state_dict)
+
+            # Save state history as JSON artifact
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, prefix="state_history_") as f:
+                json.dump(serializable_history, f, indent=2)
+                history_path = f.name
+            mlflow.log_artifact(history_path, "state_history")
+            os.unlink(history_path)
+
+            # Log additional metadata about the workflow
+            mlflow.log_param("total_workflow_steps", len(serializable_history))
+            print(f"✅ Logged state history with {len(serializable_history)} steps as artifact")
 
         # Create a small evaluation dataset with this problem
         if state["problem"]:

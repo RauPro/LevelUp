@@ -110,6 +110,10 @@ async def generate_verified_problem(request: ProblemRequest) -> dict:
         HTTPException: If problem generation fails or no valid problem could be generated
     """
     try:
+        # Create a unique ID for this workflow run to track state history
+        thread_id = str(uuid4())
+        config = {"configurable": {"thread_id": thread_id}}
+
         # Create initial state for the agent
         initial_state = create_initial_state(
             user_prompt=request.user_prompt,
@@ -117,8 +121,14 @@ async def generate_verified_problem(request: ProblemRequest) -> dict:
             difficulty=request.difficulty,
         )
 
-        final_state = agent_app.invoke(initial_state)
-        info_for_grafana = log_to_mlflow(final_state)
+        # Invoke the agent to get the final state
+        final_state = agent_app.invoke(initial_state, config=config)
+
+        # Retrieve the full state history using the thread_id
+        state_history = agent_app.get_state_history(config)
+
+        # Log results and artifacts to MLflow
+        info_for_grafana = log_to_mlflow(final_state, state_history)
         # Save to database
         run_id, metrics, problem_attempts, code_attempts = info_for_grafana
         save_evaluation_results(
