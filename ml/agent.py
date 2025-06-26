@@ -3,13 +3,13 @@ import os
 import re
 import sys
 
-import openai
 from dotenv import load_dotenv
 from e2b_code_interpreter import Sandbox
 from langchain.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
+from openai import OpenAI
 
 from app.api.schemas import DifficultyLevel, ProblemTopic
 
@@ -25,7 +25,7 @@ load_dotenv(dotenv_path=dotenv_path)
 
 # Configure MLflow
 mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000"))
-
+mlflow.langchain.autolog()
 # Create or set the experiment
 EXPERIMENT_NAME = "problem-generation"
 try:
@@ -46,7 +46,8 @@ def create_initial_state(user_prompt: str, topic: ProblemTopic, difficulty: Diff
     return SessionState(user_prompt=user_prompt, topic=topic, difficulty=difficulty, problem=None, code=None, tests_passed=False, code_attempts=0, problem_attempts=0)
 
 
-llm = ChatOpenAI(model_name="gpt-4", openai_api_key=os.getenv("OPENAI_API_KEY"))
+# Use the official OpenAI client for Nebius API
+nebius_client = OpenAI(base_url="https://api.studio.nebius.com/v1/", api_key=os.environ.get("NEBIUS_API_KEY"))
 
 sandbox = Sandbox(api_key=os.getenv("E2B_API_KEY"))
 global_prompt = ""
@@ -55,7 +56,7 @@ global_prompt = ""
 def problem_agent(state: SessionState) -> SessionState:
     global global_prompt
     """Generate programming problems using RAG approach."""
-    openai.api_key = os.getenv("OPENAI_API_KEY")
+    # openai.api_key = os.getenv("OPENAI_API_KEY")
 
     # Use the RAG retriever to get similar problems
     retrieved_problems = rag_retriever.retrieve(topic=state["topic"].value, difficulty=state["difficulty"].value, user_prompt=state["user_prompt"])
@@ -65,7 +66,7 @@ def problem_agent(state: SessionState) -> SessionState:
     global_prompt = prompt
     messages = [{"role": "user", "content": prompt}]
 
-    response = openai.chat.completions.create(model="gpt-4o", messages=messages, response_format={"type": "json_object"})
+    response = nebius_client.chat.completions.create(model="aaditya/Llama3-OpenBioLLM-70B", messages=messages, response_format={"type": "json_object"})
 
     generated_content = response.choices[0].message.content
     print(f"Generated content: {generated_content}")
@@ -104,9 +105,13 @@ def problem_agent(state: SessionState) -> SessionState:
 
             if retries < max_retries:
                 # Retry with explicit instructions to fix the format
-                retry_messages = [{"role": "user", "content": prompt}, {"role": "assistant", "content": generated_content}, {"role": "user", "content": "The response could not be parsed correctly. Please provide a valid JSON object with 'description' and 'tests' fields only. Make sure to use double quotes for keys and string values."}]
+                retry_messages = [
+                    {"role": "user", "content": prompt},
+                    {"role": "assistant", "content": generated_content},
+                    {"role": "user", "content": 'The response could not be parsed correctly. Please provide a valid JSON object with \'description\' and \'tests\' fields only. IMPORTANT: Both \'input\' and \'output\' in each test MUST be strings (not integers or arrays). For example, if the input is a list, format it as a space-separated string like \'1 2 3 4\'. Example format: {"description": "Problem description", "tests": [{"input": "1 2 3", "output": "6"}]}'},
+                ]
 
-                retry_response = openai.chat.completions.create(model="gpt-4o", messages=retry_messages, response_format={"type": "json_object"})
+                retry_response = nebius_client.chat.completions.create(model="aaditya/Llama3-OpenBioLLM-70B", messages=retry_messages, response_format={"type": "json_object"})
 
                 generated_content = retry_response.choices[0].message.content
             else:
@@ -122,14 +127,29 @@ def problem_agent(state: SessionState) -> SessionState:
     state["problem"] = problem
     state["code_attempts"] = 0  # Reset for new problem
     state["problem_attempts"] += 1
+
     return state
 
 
 def code_agent(state: SessionState) -> SessionState:
     if state["problem"] is None:
         raise ValueError("Problem must be set before generating code")
+    # Initialize LangChain LLM for code generation (using Nebius)
+    llm = ChatOpenAI(model_name="aaditya/Llama3-OpenBioLLM-70B", openai_api_base="https://api.studio.nebius.com/v1/", openai_api_key=os.environ.get("NEBIUS_API_KEY"))
+    prompt = ChatPromptTemplate.from_template("""Write a Python solution for: {problem_description}.
 
-    prompt = ChatPromptTemplate.from_template("Write a Python solution for: {problem_description}. The solution should read input from stdin and write output to stdout. If the input contains multiple values, they will be space-separated on a single line. Use input().split() to parse space-separated values. Return ONLY the Python code, no markdown formatting, no explanations. Example for adding two numbers: a, b = map(int, input().split())\nprint(a + b)")
+IMPORTANT INPUT INSTRUCTIONS:
+1. The solution MUST read input from stdin using input().split() to parse space-separated values
+2. Always parse the input as a LIST OF INTEGERS using: list(map(int, input().split()))
+3. DO NOT assume the input is a single integer - always handle it as a list of integers
+4. Return ONLY the Python code, no markdown formatting, no explanations
+
+Example for processing integers from a single line:
+```python
+numbers = list(map(int, input().split()))
+# process numbers list
+print(result)
+```""")
     chain = prompt | llm | StrOutputParser()
     code = chain.invoke({"problem_description": state["problem"].description})
 
@@ -305,6 +325,35 @@ workflow.add_edge("code_agent", "run_tests")
 workflow.add_conditional_edges("run_tests", lambda state: "end" if should_end(state) else ("code_agent" if should_continue_coding(state) else "problem_agent"), {"end": END, "code_agent": "code_agent", "problem_agent": "problem_agent"})
 
 app = workflow.compile()
+
+# import json
+# config = {}
+# # Assuming `graph` is your Pregel graph object (e.g., from LangGraph)
+# # Replace `graph` with your actual graph instance
+# state_history = app.get_state_history(config=config)  # Returns a generator
+
+# # Collect snapshots and save as JSON
+# snapshots = []
+# for snapshot in state_history:
+#     snapshots.append({
+#         "timestamp": snapshot['ts'],
+#         "state": snapshot['state'],
+#         "config": snapshot.get('config', 'N/A')
+#     })
+
+# # Save to JSON file
+# with open('state_history.json', 'w') as f:
+#     json.dump(snapshots, f, indent=2)
+
+#     snapshots.append({
+#         "timestamp": snapshot['ts'],
+#         "state": snapshot['state'],
+#         "config": snapshot.get('config', 'N/A')
+#     })
+
+# # Save to JSON file
+# with open('state_history.json', 'w') as f:
+#     json.dump(snapshots, f, indent=2)
 
 
 def save_graph_visualization() -> None:
