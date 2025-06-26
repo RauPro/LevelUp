@@ -55,6 +55,7 @@ sandbox = Sandbox(api_key=os.getenv("E2B_API_KEY"))
 global_prompt = ""
 
 
+@mlflow.trace(name="problem_generation", attributes={"component": "problem_agent"})
 def problem_agent(state: SessionState) -> SessionState:
     global global_prompt
     """Generate programming problems using RAG approach."""
@@ -144,6 +145,7 @@ def problem_agent(state: SessionState) -> SessionState:
     return state
 
 
+@mlflow.trace(name="code_generation", attributes={"component": "code_agent"})
 def code_agent(state: SessionState) -> SessionState:
     if state["problem"] is None:
         raise ValueError("Problem must be set before generating code")
@@ -182,6 +184,7 @@ print(result)
     return state
 
 
+@mlflow.trace(name="test_execution", attributes={"component": "run_tests"})
 def run_tests(state: SessionState) -> SessionState:
     """Run tests using E2B sandbox if available, otherwise use local execution."""
 
@@ -223,6 +226,12 @@ def run_tests(state: SessionState) -> SessionState:
                 output = execution.logs.stdout[0].strip()
                 expected = test["output"].strip()
 
+                # Normalize boolean representations for comparison
+                def normalize_boolean_output(value):
+                    if value.lower() in ['true', 'false']:
+                        return value.lower()
+                    return value
+
                 # Normalize formats for comparison
                 if expected.startswith("[") and expected.endswith("]"):
                     try:
@@ -246,7 +255,10 @@ def run_tests(state: SessionState) -> SessionState:
                         # Fall back to direct comparison if parsing fails
                         state["tests_passed"] = output == expected
                 else:
-                    state["tests_passed"] = output == expected
+                    # Handle boolean comparisons by normalizing case
+                    normalized_output = normalize_boolean_output(output)
+                    normalized_expected = normalize_boolean_output(expected)
+                    state["tests_passed"] = normalized_output == normalized_expected
 
                 print(f"Expected: '{expected}', Got: '{output}', Passed: {state['tests_passed']}")
             else:
@@ -275,6 +287,12 @@ def run_tests(state: SessionState) -> SessionState:
                 output = process.stdout.strip()
                 expected = test["output"].strip()
 
+                # Normalize boolean representations for comparison
+                def normalize_boolean_output(value):
+                    if value.lower() in ['true', 'false']:
+                        return value.lower()
+                    return value
+
                 # Normalize formats for comparison (same logic as above)
                 if expected.startswith("[") and expected.endswith("]"):
                     try:
@@ -292,7 +310,10 @@ def run_tests(state: SessionState) -> SessionState:
                     except (json.JSONDecodeError, ValueError):
                         state["tests_passed"] = output == expected
                 else:
-                    state["tests_passed"] = output == expected
+                    # Handle boolean comparisons by normalizing case
+                    normalized_output = normalize_boolean_output(output)
+                    normalized_expected = normalize_boolean_output(expected)
+                    state["tests_passed"] = normalized_output == normalized_expected
 
                 print(f"Expected: '{expected}', Got: '{output}', Passed: {state['tests_passed']}")
             else:
