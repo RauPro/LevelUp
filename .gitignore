@@ -184,6 +184,13 @@ Desktop.ini
 
 # DVC
 .dvc/cache
+/.vscode/
+/ml/
+/mlartifacts/
+/mlruns/
+/models/
+/app/final_state.json
+/.vscode/
 /data/chroma_db/
 /data/hf_cache/
 

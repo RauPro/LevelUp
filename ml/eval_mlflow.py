@@ -7,6 +7,14 @@ from collections.abc import Iterator
 import mlflow
 import pandas as pd
 from dotenv import load_dotenv
+from packaging.version import Version
+
+# MLflow version check for tracing functionality
+assert Version(mlflow.__version__) >= Version("2.14.3"), (
+    "This feature requires MLflow version 2.14.3 or newer. "
+    "Please run '%pip install -U mlflow' in a notebook cell, "
+    "and restart the kernel when the command finishes."
+)
 
 from ml.agent import global_prompt
 from ml.metrics import API_KEY, MODEL_URI
@@ -16,6 +24,7 @@ from models.state import Problem, SessionState
 load_dotenv()
 
 
+@mlflow.trace(name="mlflow_evaluation", attributes={"component": "evaluation_logger"})
 def log_to_mlflow(state: SessionState, state_history: Iterator = None) -> tuple:
     """
     Log metrics and full session state to MLflow using the built-in evaluation framework.
@@ -103,6 +112,8 @@ def log_to_mlflow(state: SessionState, state_history: Iterator = None) -> tuple:
                         topic_relevance_metric,
                         difficulty_accuracy_metric,
                     ],
+                    targets="predictions",
+                    feature_names=["inputs"],
                     evaluator_config={"col_mapping": {"inputs": "inputs", "predictions": "predictions"}},
                 )
 
