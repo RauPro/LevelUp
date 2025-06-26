@@ -13,6 +13,11 @@ from app.api.schemas import (
     ProblemTopic,
 )
 from data.sql_db.insert_grafana_data import save_evaluation_results
+from data.sql_db.session_state_db import (
+    save_session_state,
+    get_session_state,
+    get_session_states_by_criteria,
+)  # Updated import
 from ml.agent import app as agent_app
 from ml.agent import create_initial_state
 from ml.eval_mlflow import log_to_mlflow
@@ -138,6 +143,15 @@ async def generate_verified_problem(request: ProblemRequest) -> dict:
             code_attempts=code_attempts,
         )
 
+        # Save session state to database
+        workflow_status = 'completed' if final_state["tests_passed"] else 'failed'
+        save_session_state(
+            thread_id=thread_id,
+            state=final_state,
+            run_id=run_id,
+            workflow_status=workflow_status
+        )
+
         # Check if tests passed
         if not final_state["tests_passed"]:
             raise ValueError("Could not generate a problem with passing test cases")
@@ -205,3 +219,72 @@ async def get_problem(problem_id: str) -> ProblemResponse:
         difficulty=DifficultyLevel.MEDIUM,
         topic=ProblemTopic.ARRAYS,
     )
+
+
+@router.get("/sessions/{thread_id}", response_model=dict)
+async def get_session_by_thread_id(thread_id: str) -> dict:
+    """
+    Retrieve a session state by thread ID.
+    
+    Args:
+        thread_id: The unique thread identifier for the session
+        
+    Returns:
+        dict: The session state data
+        
+    Raises:
+        HTTPException: If the session is not found
+    """
+    session_data = get_session_state(thread_id)
+    if not session_data:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    return {"session": session_data}
+
+
+@router.get("/sessions", response_model=dict)
+async def get_sessions(
+    topic: str = None,
+    difficulty: str = None, 
+    workflow_status: str = None,
+    tests_passed: bool = None,
+    limit: int = 50
+) -> dict:
+    """
+    Retrieve session states based on filtering criteria.
+    
+    Args:
+        topic: Filter by problem topic (optional)
+        difficulty: Filter by difficulty level (optional)
+        workflow_status: Filter by workflow status (optional)
+        tests_passed: Filter by test success status (optional) 
+        limit: Maximum number of sessions to return (default: 50, max: 100)
+        
+    Returns:
+        dict: List of session states matching the criteria
+    """
+    # Validate limit
+    if limit > 100:
+        limit = 100
+    
+    sessions = get_session_states_by_criteria(
+        topic=topic,
+        difficulty=difficulty,
+        workflow_status=workflow_status,
+        tests_passed=tests_passed,
+        limit=limit
+    )
+    
+    return {
+        "sessions": sessions,
+        "count": len(sessions),
+        "filters": {
+            "topic": topic,
+            "difficulty": difficulty,
+            "workflow_status": workflow_status,
+            "tests_passed": tests_passed,
+            "limit": limit
+        }
+    }
+
+
