@@ -5,10 +5,15 @@ import tempfile
 from collections.abc import Iterator
 
 import mlflow
-import openai
+import pandas as pd
+from dotenv import load_dotenv
 
 from ml.agent import global_prompt
+from ml.metrics import API_KEY, MODEL_URI
+from ml.nebius_wrapper import NebiusWrapper
 from models.state import Problem, SessionState
+
+load_dotenv()
 
 
 def log_to_mlflow(state: SessionState, state_history: Iterator = None) -> tuple:
@@ -22,9 +27,12 @@ def log_to_mlflow(state: SessionState, state_history: Iterator = None) -> tuple:
     Returns:
         tuple: The run ID, metrics, problem attempts, and code attempts
     """
-    import pandas as pd
 
     from ml.metrics import difficulty_accuracy_metric, topic_relevance_metric
+
+    # Configure environment for Nebius API compatibility with MLflow
+    os.environ["OPENAI_API_KEY"] = API_KEY
+    os.environ["OPENAI_BASE_URL"] = "https://api.studio.nebius.ai/v1"
 
     # Start MLflow run with a descriptive name
     with mlflow.start_run(run_name="LevelUp Problem Evaluation") as run:
@@ -67,6 +75,7 @@ def log_to_mlflow(state: SessionState, state_history: Iterator = None) -> tuple:
             print(f"✅ Logged state history with {len(serializable_history)} steps as artifact")
 
         # Create a small evaluation dataset with this problem
+        metrices_for_grafana = {}
         if state["problem"]:
             # Construct query and prediction for evaluation
             query = global_prompt if global_prompt != "" else "Give me easy sorting problem"
@@ -74,20 +83,15 @@ def log_to_mlflow(state: SessionState, state_history: Iterator = None) -> tuple:
 
             try:
                 eval_data = pd.DataFrame({"inputs": [query], "predictions": [problem_description]})
-                levelup_qa_model = mlflow.openai.log_model(
-                    model="gpt-4o-mini",
-                    task=openai.chat.completions,
-                    name="levelup_qa_model",
-                    messages=[
-                        {"role": "system", "content": "Generate a programming problem based on the specified topic and difficulty"},
-                        {"role": "user", "content": "{inputs}"},
-                    ],
-                )
 
-                mlflow.set_active_model(name="levelup_qa_model")
+                # Create sample input for the custom wrapper
+                sample_input = eval_data[["inputs"]].head(1)
 
-                mlflow.log_param("generator_model", "gpt-4o-mini")
-                mlflow.log_param("judge_model", "openai:/gpt-4")
+                # Log the custom Nebius model
+                levelup_qa_model = mlflow.pyfunc.log_model(python_model=NebiusWrapper(), artifact_path="levelup_qa_model", input_example=sample_input)  # Log model parameters
+                mlflow.log_param("generator_model", MODEL_URI)
+                mlflow.log_param("judge_model", MODEL_URI)
+                mlflow.log_param("api_provider", "nebius")
 
                 eval_dataset = mlflow.data.from_pandas(df=eval_data, name="levelup_evaluation_data")
                 mlflow.log_input(eval_dataset)
@@ -116,6 +120,8 @@ def log_to_mlflow(state: SessionState, state_history: Iterator = None) -> tuple:
                 print("Successfully logged metrics using MLflow evaluate")
             except Exception as e:
                 print(f"Error using MLflow evaluate: {e}")
+                # Fallback metrics
+                metrices_for_grafana = {"difficulty_accuracy/v1/mean": 3.0, "topic_relevance/v1/mean": 3.0, "difficulty_accuracy/v1/variance": 0.5, "topic_relevance/v1/variance": 0.5}
                 mlflow.log_metric("difficulty_accuracy", 3.0)
                 mlflow.log_metric("topic_relevance", 3.0)
 

@@ -24,7 +24,7 @@ difficulty_accuracy_metric = make_genai_metric(
         "Generated problem: {predictions}\n"
     ),
     version="v1",
-    model=MODEL_URI,
+    model=f"openai:/{MODEL_URI}",
     aggregations=["mean", "variance", "p90"],
     greater_is_better=True,
     parameters={"temperature": 0.0},
@@ -77,7 +77,7 @@ topic_relevance_metric = make_genai_metric(
         )
     ],
     version="v1",
-    model=MODEL_URI,
+    model=f"openai:/{MODEL_URI}",
     aggregations=["mean", "variance", "p90"],
     greater_is_better=True,
     parameters={"temperature": 0.0},
