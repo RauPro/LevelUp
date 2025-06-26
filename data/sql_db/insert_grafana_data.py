@@ -3,6 +3,8 @@ import os
 import numpy as np
 from datetime import datetime
 
+from ml.agent import EXPERIMENT_NAME
+
 def get_db_connection():
     """Get database connection using environment variables"""
     return psycopg2.connect(
@@ -13,7 +15,7 @@ def get_db_connection():
         port=os.getenv('POSTGRES_PORT', '5432')
     )
 
-def save_evaluation_results(run_id, metrics_dict, problem_attempts, code_attempts, experiment_id=None):
+def save_evaluation_results(run_id, metrics_dict, problem_attempts, code_attempts, experiment_id=EXPERIMENT_NAME):
     """
     Save complete evaluation results to database
     """
