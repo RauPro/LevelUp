@@ -1,4 +1,6 @@
+import asyncio
 from uuid import uuid4
+import concurrent.futures
 
 from fastapi import APIRouter, HTTPException
 
@@ -18,6 +20,27 @@ from ml.agent import create_initial_state
 from ml.eval_mlflow import log_to_mlflow
 
 router = APIRouter()
+
+
+async def async_log_to_mlflow(final_state, state_history):
+    """Async wrapper for MLflow logging"""
+    loop = asyncio.get_event_loop()
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        return await loop.run_in_executor(executor, log_to_mlflow, final_state, state_history)
+
+
+async def async_save_evaluation_results(run_id, metrics_dict, problem_attempts, code_attempts):
+    """Async wrapper for saving evaluation results"""
+    loop = asyncio.get_event_loop()
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        return await loop.run_in_executor(executor, save_evaluation_results, run_id, metrics_dict, problem_attempts, code_attempts)
+
+
+async def async_save_session_state(thread_id, state, run_id, workflow_status):
+    """Async wrapper for saving session state"""
+    loop = asyncio.get_event_loop()
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        return await loop.run_in_executor(executor, save_session_state, thread_id, state, run_id, workflow_status)
 
 
 @router.get("/topics", response_model=list[str])
@@ -40,7 +63,7 @@ async def generate_verified_problem(request: ProblemRequest) -> dict:
     2. Writes a solution for the problem
     3. Tests the solution against the test cases
     4. Only returns problems where the tests pass
-    5. Logs metrics and state to MLflow for monitoring
+    5. Logs metrics and state to MLflow for monitoring (asynchronously)
 
     Args:
         request: ProblemRequest containing topic, difficulty, and user_prompt
@@ -69,20 +92,26 @@ async def generate_verified_problem(request: ProblemRequest) -> dict:
         # Retrieve the full state history using the thread_id
         state_history = agent_app.get_state_history(config)
 
-        # Log results and artifacts to MLflow
-        info_for_grafana = log_to_mlflow(final_state, state_history)
-        # Save to database
-        run_id, metrics, problem_attempts, code_attempts = info_for_grafana
-        save_evaluation_results(
-            run_id=run_id,
-            metrics_dict=metrics,
-            problem_attempts=problem_attempts,
-            code_attempts=code_attempts,
-        )
+        # Start async logging operations in the background
+        async def background_logging():
+            try:
+                # Log results and artifacts to MLflow asynchronously
+                info_for_grafana = await async_log_to_mlflow(final_state, state_history)
+                run_id, metrics, problem_attempts, code_attempts = info_for_grafana
 
-        # Save session state to database
-        workflow_status = "completed" if final_state["tests_passed"] else "failed"
-        save_session_state(thread_id=thread_id, state=final_state, run_id=run_id, workflow_status=workflow_status)
+                # Run database operations concurrently
+                workflow_status = "completed" if final_state["tests_passed"] else "failed"
+
+                await asyncio.gather(
+                    async_save_evaluation_results(run_id, metrics, problem_attempts, code_attempts),
+                    async_save_session_state(thread_id, final_state, run_id, workflow_status),
+                    return_exceptions=True
+                )
+            except Exception as e:
+                print(f"Background logging error: {e}")
+
+        # Start background logging task without waiting for it
+        asyncio.create_task(background_logging())
 
         # Check if tests passed
         if not final_state["tests_passed"]:
@@ -114,7 +143,6 @@ async def generate_verified_problem(request: ProblemRequest) -> dict:
                 "topic": request.topic,
                 "solution": final_state["code"] if final_state["code"] else "No solution available",
             }
-
             return {"response": problem_response}
         else:
             raise ValueError("No problem was generated")
