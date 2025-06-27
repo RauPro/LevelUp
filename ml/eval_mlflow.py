@@ -108,14 +108,14 @@ def log_to_mlflow(state: SessionState, state_history: Iterator = None) -> tuple:
                     data=eval_data,
                     model=levelup_qa_model.model_uri,
                     extra_metrics=[
-                        topic_relevance_metric,
                         difficulty_accuracy_metric,
+                        topic_relevance_metric
                     ],
                     targets="predictions",
                     feature_names=["inputs"],
                     evaluator_config={"col_mapping": {"inputs": "inputs", "predictions": "predictions"}},
                 )
-
+                print(results.tables["eval_results_table"])
                 print("Evaluation Results:")
                 metrices_for_grafana = {}
                 for metric_name, value in results.metrics.items():
