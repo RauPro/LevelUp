@@ -332,11 +332,11 @@ def should_continue_coding(state: SessionState) -> bool:
 
 
 def should_regenerate_problem(state: SessionState) -> bool:
-    return not state["tests_passed"] and state["code_attempts"] >= 5 and state["problem_attempts"] < 2
+    return not state["tests_passed"] and state["code_attempts"] >= 5 and state["problem_attempts"] < 5
 
 
 def should_end(state: SessionState) -> bool:
-    return state["tests_passed"] or state["problem_attempts"] >= 2
+    return state["tests_passed"] or state["problem_attempts"] >= 5
 
 
 workflow = StateGraph(SessionState)

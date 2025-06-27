@@ -69,7 +69,7 @@ class RagRetriever:
             "    // You can include multiple examples\n"
             "  ]\n"
             "}\n"
-            "Make sure your problem is unique and appropriate for the difficulty level. Include at least two test cases with input and output examples.\n"
+            "Make sure your problem is unique and appropriate for the difficulty level. Include at least one test cases with input and output examples with a clear and standard definition of it.\n"
         )
 
         return prompt

@@ -11,6 +11,62 @@ services:
       - "3000:3000"
     volumes:
       - grafana_data:/var/lib/grafana
+    networks:
+      - levelup-network
+
+  backend:
+    build:
+      context: .
+      dockerfile: ./app/Dockerfile
+    ports:
+      - "8000:80"
+    volumes:
+      - ./app:/code/app
+      - ./data:/code/data
+      - ./ml:/code/ml
+      - ./models:/code/models
+      - ./pipelines:/code/pipelines
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - levelup-network
+
+  frontend:
+    build:
+      context: ./LevelUpUi
+      dockerfile: Dockerfile
+    ports:
+      - "4200:4200"
+    volumes:
+      - ./LevelUpUi:/app
+      - /app/node_modules
+    command: npm start -- --host 0.0.0.0 --port 4200
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - NG_APP_BACKEND_URL=http://backend:80
+    depends_on:
+      - backend
+    networks:
+      - levelup-network
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.13.0
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow_data:/mlflow
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri /mlflow
+      --default-artifact-root /mlflow/artifacts
+    networks:
+      - levelup-network
+
+networks:
+  levelup-network:
+    driver: bridge
 
 volumes:
   grafana_data:
+  mlflow_data:
