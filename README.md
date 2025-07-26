@@ -30,6 +30,8 @@ Our primary customers and stakeholders include:
 
 The LevelUp platform is built on a robust and scalable machine learning system architecture:
 
+![ML System Workflow](ML-System-Workflow.png)
+
 1.  **User Interface**: A simple and intuitive web-based interface where users can input their desired problem parameters.
 2.  **Backend API Layer**: A FastAPI-based backend that handles user requests and orchestrates the problem generation workflow.
 3.  **Data Ingestion**: A scraper ingests problems from sources like Codeforces. This data is then preprocessed and stored.
@@ -50,6 +52,22 @@ The LevelUp platform is built on a robust and scalable machine learning system a
     -   **Generator Model (LLM)**
 -   **ML Approach**: Retrieval Augmented Generation (RAG)
 -   **Data Source**: Hugging Face dataset `evanellis/codeforces_with_only_correct_completions`
+
+## 📊 Performance Monitoring & Analytics
+
+LevelUp incorporates comprehensive monitoring and analytics capabilities to ensure optimal system performance and user experience. Our monitoring infrastructure provides real-time insights into system metrics, model performance, and user interaction patterns.
+
+![Grafana Dashboard](Grafana_Dashboard.png)
+
+### Key Monitoring Metrics:
+
+- **Difficulty Accuracy Metrics**: Track how well the system generates problems at the requested difficulty levels
+- **Topic Relevance Metrics**: Monitor the relevance of generated problems to specified topics
+- **Problem and Code Attempts**: Analyze user engagement and problem-solving patterns
+- **System Performance**: Real-time monitoring of response times, throughput, and error rates
+- **Model Quality**: Continuous evaluation of LLM output quality and RAG retrieval effectiveness
+
+The dashboard provides actionable insights that help optimize the platform's performance and ensure consistent delivery of high-quality interview problems.
 
 ## ⚙️ Setup and Installation
 
